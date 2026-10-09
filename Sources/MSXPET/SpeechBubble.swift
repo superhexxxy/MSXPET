@@ -42,7 +42,7 @@ public final class SpeechBubble {
         let h: CGFloat = 26
         w = min(w, 320)
         var bx = petOrigin.x + petSize / 2 - w / 2
-        var by = petOrigin.y + petSize + 8
+        var by = petOrigin.y + petSize + 24
         bx = min(max(bx, visibleRect.minX + 8), visibleRect.maxX - w - 8)
         by = min(max(by, visibleRect.minY + 8), visibleRect.maxY - h - 8)
         window.setFrame(NSRect(x: bx, y: by, width: w, height: h), display: true)
@@ -60,7 +60,7 @@ public final class SpeechBubble {
         guard isShowing else { return }
         let w = window.frame.width, h = window.frame.height
         var bx = petOrigin.x + petSize / 2 - w / 2
-        var by = petOrigin.y + petSize + 8
+        var by = petOrigin.y + petSize + 24
         bx = min(max(bx, visibleRect.minX + 8), visibleRect.maxX - w - 8)
         by = min(max(by, visibleRect.minY + 8), visibleRect.maxY - h - 8)
         window.setFrameOrigin(NSPoint(x: bx, y: by))

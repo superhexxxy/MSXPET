@@ -22,6 +22,7 @@ public final class PetView: NSView {
     public var onDragMove: ((CGPoint) -> Void)?
     public var onDragEnd: (() -> Void)?
     public var onClick: (() -> Void)?
+    public var onHover: (() -> Void)?
     private var downScreen: CGPoint?
     private var movedSinceDown = false
     private static let clickThreshold: CGFloat = 3
@@ -132,5 +133,20 @@ public final class PetView: NSView {
     override public func rightMouseDown(with event: NSEvent) {
         _ = event
         onClick?()
+    }
+
+    // Hover pets: cursor brushes (no click) earn a wiggle. Tracking areas
+    // fire on the frame regardless of the alpha hit-test.
+    override public func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        for area in trackingAreas { removeTrackingArea(area) }
+        addTrackingArea(NSTrackingArea(rect: bounds,
+                                       options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+                                       owner: self, userInfo: nil))
+    }
+
+    override public func mouseEntered(with event: NSEvent) {
+        _ = event
+        onHover?()
     }
 }

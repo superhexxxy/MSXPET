@@ -165,6 +165,26 @@ public final class PetManager {
         poke()
     }
 
+    /// Snack time! Feeds the whole clowder (wakes sleepers — food > sleep).
+    public func feed() {
+        for p in pets {
+            p.engine.feed()
+            p.showBubbleIfNew()
+        }
+        poke()
+    }
+
+    /// Display name for menus/tags: custom name or species, numbered in a pack.
+    public func displayName(for index: Int) -> String {
+        let base = UserDefaults.standard.string(forKey: Config.nameKey) ?? petName.capitalized
+        return pets.count > 1 ? "\(base) #\(index + 1)" : base
+    }
+
+    /// (name, mood 0-100) per pet, for the Mood menu.
+    public func moods() -> [(String, Int)] {
+        pets.enumerated().map { (displayName(for: $0), Int($1.engine.mood)) }
+    }
+
     public func setLaser(_ on: Bool) {
         laserOn = on
         UserDefaults.standard.set(on, forKey: Config.laserKey)
@@ -293,9 +313,11 @@ public final class PetManager {
         }
         separatePets()
         let overlays = activeOverlays()
-        for p in pets {
+        for (i, p) in pets.enumerated() {
             p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible)
             p.applyOverlays(p.engine.state == .sleeping || p.engine.clinging ? [] : overlays)
+            p.updateTag(show: pets.count >= 2, name: displayName(for: i),
+                        visibleRect: visible)
         }
         // Deliver due dialogue lines.
         for (idx, line) in dialogue.update(dtMs: dtMs) {

@@ -30,6 +30,7 @@ public final class Pet {
 
     /// Sound outlet: PetManager connects this to SoundManager.play.
     public var soundHandler: ((SoundEvent) -> Void)?
+    private let tag = PetTag()
 
     public init(petName: String, assets: ([PetState: [NSImage]], [PetState: [CGPoint]], CGPoint), at origin: CGPoint) {
         self.petName = petName
@@ -49,6 +50,7 @@ public final class Pet {
         view.onDragMove = { [weak self] pt in self?.handleDragMove(screen: pt) }
         view.onDragEnd = { [weak self] in self?.handleDragEnd() }
         view.onClick = { [weak self] in self?.handleClick() }
+        view.onHover = { [weak self] in self?.handleHover() }
 
         updateWindowPosition()
         window.orderFrontRegardless()
@@ -56,6 +58,7 @@ public final class Pet {
 
     public func close() {
         bubble.hide()
+        tag.hide()
         window.orderOut(nil)
     }
 
@@ -117,6 +120,17 @@ public final class Pet {
     private func handleClick() {
         engine.interact()
         showBubbleIfNew()
+    }
+
+    private func handleHover() {
+        engine.nuzzle()
+        showBubbleIfNew()
+    }
+
+    /// Name tag follows above (manager decides show + name).
+    public func updateTag(show: Bool, name: String, visibleRect: CGRect) {
+        tag.update(name: name, show: show, above: window.frame.origin,
+                   petSize: Config.petSize, visibleRect: visibleRect)
     }
 
     // MARK: - Per-tick

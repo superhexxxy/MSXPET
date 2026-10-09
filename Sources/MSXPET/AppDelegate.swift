@@ -5,7 +5,7 @@
 import AppKit
 import ServiceManagement
 
-public final class AppDelegate: NSObject, NSApplicationDelegate {
+public final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var manager: PetManager?
     private var statusItem: NSStatusItem?
     private var petItems: [String: NSMenuItem] = [:]
@@ -14,6 +14,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var laserItem: NSMenuItem?
     private var soundItem: NSMenuItem?
     private var accessoriesRoot: NSMenuItem?
+    private var moodRoot: NSMenuItem?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         _ = notification
@@ -75,6 +76,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         soundItem?.target = self
         soundItem?.state = (manager?.soundEnabled ?? true) ? .on : .off
         menu.addItem(soundItem!)
+        let snack = NSMenuItem(title: "Give snack", action: #selector(feed), keyEquivalent: "f")
+        snack.target = self
+        menu.addItem(snack)
+        moodRoot = NSMenuItem(title: "Mood", action: nil, keyEquivalent: "")
+        moodRoot?.submenu = NSMenu()
+        menu.addItem(moodRoot!)
+        refreshMoodMenu()
         let soundsMenu = NSMenu()
         let reveal = NSMenuItem(title: "Reveal Sounds Folder…", action: #selector(revealSounds), keyEquivalent: "")
         reveal.target = self
@@ -98,6 +106,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         quit.target = self
         menu.addItem(quit)
         laserItem?.state = (manager?.laserOn ?? false) ? .on : .off
+        menu.delegate = self
         statusItem?.menu = menu
     }
 
@@ -163,6 +172,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         soundItem?.state = on ? .on : .off
     }
     @objc private func revealSounds() { SoundManager.revealFolder() }
+    @objc private func feed() { manager?.feed() }
+
+    // Mood submenu refreshes live on every open (NSMenuDelegate).
+    public func menuNeedsUpdate(_ menu: NSMenu) { refreshMoodMenu() }
+
+    private func refreshMoodMenu() {
+        guard let sub = moodRoot?.submenu else { return }
+        sub.removeAllItems()
+        for (name, mood) in manager?.moods() ?? [] {
+            sub.addItem(withTitle: "\(name) — \(Config.moodWord(CGFloat(mood))) (\(mood))",
+                        action: nil, keyEquivalent: "")
+        }
+    }
     @objc private func rename() {
         let alert = NSAlert()
         alert.messageText = "Name your pet"

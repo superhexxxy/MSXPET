@@ -28,6 +28,18 @@ public enum Config {
 
     public static let petName = "neko"
     public static let availablePets = ["neko", "bsd", "dog"]
+
+    /// Human word for the hidden mood stat (menu display).
+    public static func moodWord(_ mood: CGFloat) -> String {
+        switch mood {
+        case 85...: return "blissful"
+        case 65...: return "happy"
+        case 45...: return "content"
+        case 25...: return "drowsy"
+        default: return "grumpy"
+        }
+    }    
+
     public static let selectedPetKey = "MSXPET.pet"
     public static let nameKey = "MSXPET.name"
     public static let laserKey = "MSXPET.laser"

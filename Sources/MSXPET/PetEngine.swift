@@ -95,6 +95,8 @@ public struct PetEngine {
     private var startleCooldownMs = 0
     // Grooming: idle spa breaks (happy flash + line, no click needed).
     private var groomCooldownMs = 40_000
+    // Hover affection: cursor brushes past → wiggle (short happy).
+    private var hoverCooldownMs = 0
 
     // Remember pre-drag state (upstream was_chasing / was_frozen)
     private var wasChasing = false
@@ -299,6 +301,7 @@ public struct PetEngine {
             mood = max(0, mood - 2)
         }
         if catchCooldownMs > 0 { catchCooldownMs -= dtMs }
+        if hoverCooldownMs > 0 { hoverCooldownMs -= dtMs }
         if zoomieCooldownMs > 0 { zoomieCooldownMs -= dtMs }
         if begCooldownMs > 0 { begCooldownMs -= dtMs }
         if ambientCooldownMs > 0 { ambientCooldownMs -= dtMs }
@@ -583,6 +586,42 @@ public struct PetEngine {
     public mutating func say(_ line: String) {
         speech = line
         speechTimeMs = 0
+    }
+
+    /// Snack time! Big mood boost + nom. Wakes sleepers (food > sleep).
+    public mutating func feed() {
+        mood = min(100, mood + 20)
+        if state == .sleeping || frozen {
+            frozen = false
+            unfreezeDelayMs = 0
+            frozenTimeMs = 0
+            setState(.idle)
+            speech = "FOOD?!"
+        } else if state != .happy && state != .swat && !dragging && !falling {
+            previousState = state
+            setState(.happy)
+            happyTimeMs = 0
+            speech = "nom!!"
+        } else {
+            speech = "nom!!"
+        }
+        speechTimeMs = 0
+        soundCue = .happy
+    }
+
+    /// Hover affection: a cursor brush-past earns a 1.2s wiggle + chirp.
+    /// Cooldown-gated so sweeping the cursor around isn't a chirp machine.
+    public mutating func nuzzle() {
+        guard state != .happy && state != .swat && !dragging && !falling
+                && !frozen && !chasing && hoverCooldownMs <= 0 else { return }
+        hoverCooldownMs = 15_000
+        previousState = state
+        setState(.happy)
+        happyTimeMs = Config.happyDurationMs - 1200
+        mood = min(100, mood + 3)
+        speech = ["hee!", "* wiggles *", "mrr!"].randomElement()!
+        speechTimeMs = 0
+        soundCue = .happy
     }
 
     /// Pet-pet greeting: mutual happy flash with a cute line.

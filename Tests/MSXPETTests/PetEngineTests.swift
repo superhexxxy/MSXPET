@@ -387,6 +387,46 @@ final class PetEngineTests: XCTestCase {
         XCTAssertTrue(Config.greetPhrases.contains(a.speech ?? ""))
     }
 
+    func testFeedBoostsAndWakes() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.mood = 95
+        e.feed()
+        XCTAssertEqual(e.mood, 100, accuracy: 0.001)
+        XCTAssertEqual(e.speech, "nom!!")
+        var s = PetEngine(x: 500, y: 500)
+        s.hourOverride = 12
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        s.toggleFreeze()
+        for _ in 0..<400 { s.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        XCTAssertEqual(s.state, .sleeping)
+        s.feed()
+        XCTAssertFalse(s.frozen)
+        XCTAssertEqual(s.speech, "FOOD?!")
+    }
+
+    func testNuzzleWiggleAndCooldown() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.targetX = 500; e.targetY = 500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        for _ in 0..<300 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        e.nuzzle()
+        XCTAssertEqual(e.state, .happy)
+        XCTAssertEqual(e.mood, 73, accuracy: 0.001)
+        e.soundCue = nil
+        e.nuzzle()
+        XCTAssertNil(e.soundCue, "hover cooldown gates repeat chirps")
+    }
+
+    func testMoodWords() {
+        XCTAssertEqual(Config.moodWord(90), "blissful")
+        XCTAssertEqual(Config.moodWord(70), "happy")
+        XCTAssertEqual(Config.moodWord(50), "content")
+        XCTAssertEqual(Config.moodWord(30), "drowsy")
+        XCTAssertEqual(Config.moodWord(10), "grumpy")
+    }
+
     func testZoomiesFireOnTrips() {
         var e = PetEngine(x: 500, y: 500)
         e.hourOverride = 12
@@ -445,5 +485,3 @@ final class PetEngineTests: XCTestCase {
         XCTAssertTrue(groomed, "long idles must include a spa break")
     }
 }
-        XCTAssertTrue(seen, "frisky pets must zoom eventually")
-    }
