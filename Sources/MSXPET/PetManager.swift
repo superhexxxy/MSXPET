@@ -37,7 +37,8 @@ public final class PetManager {
             engine.pickRandomDestination(in: v, margin: Config.wanderMargin)
         }
 
-        view.onDrag = { [weak self] dx, dy in self?.handleDrag(dx: dx, dy: dy) }
+        view.onDragStart = { [weak self] pt in self?.handleDragStart(screen: pt) }
+        view.onDragMove = { [weak self] pt in self?.handleDragMove(screen: pt) }
         view.onDragEnd = { [weak self] in self?.handleDragEnd() }
         view.onClick = { [weak self] in self?.handleClick() }
 
@@ -64,11 +65,15 @@ public final class PetManager {
 
     // MARK: - Input
 
-    private func handleDrag(dx: CGFloat, dy: CGFloat) {
-        if !engine.dragging { engine.beginDrag() }
-        // PetView reports view-space delta (y-down); convert to screen (y-up).
-        engine.dragBy(dx: dx, dy: -dy)
+    private func handleDragStart(screen: CGPoint) {
+        if !engine.dragging { engine.beginDrag(mouseScreen: screen) }
         bubble.hide()
+    }
+
+    private func handleDragMove(screen: CGPoint) {
+        if !engine.dragging { engine.beginDrag(mouseScreen: screen) }
+        engine.dragTo(mouseScreen: screen)
+        updateWindowPosition() // sync now — zero frames of follow lag
     }
 
     private func handleDragEnd() {

@@ -31,6 +31,11 @@ public struct PetEngine {
     private var wasChasing = false
     private var wasFrozen = false
 
+    // Grab offset in screen points (upstream drag_offset_x/y). Absolute
+    // positioning: pet = mouseScreen - offset. Immune to event/timer
+    // interleaving, unlike window-relative deltas.
+    private var dragOffset = CGVector(dx: 0, dy: 0)
+
     // Octant flicker filter (see filteredDirection): candidate direction
     // must win this many consecutive ticks before the sprite switches.
     private static let directionPersistenceTicks = 6
@@ -89,14 +94,22 @@ public struct PetEngine {
 
     // MARK: - Interactions (mirror on_button_press/release, pet_* in xpet.c)
 
-    public mutating func beginDrag() {
+    /// Grab the pet. mouseScreen must be global AppKit screen coords
+    /// (NSEvent.mouseLocation space — same space as x/y). Records the
+    /// grab offset so dragTo() tracks 1:1, mirroring upstream's
+    /// drag_offset + XQueryPointer absolute positioning.
+    public mutating func beginDrag(mouseScreen: CGPoint) {
         wasChasing = chasing; wasFrozen = frozen
         dragging = true; frozen = true; chasing = false
+        dragOffset = CGVector(dx: mouseScreen.x - x, dy: mouseScreen.y - y)
         setState(.dragged)
     }
 
-    public mutating func dragBy(dx: CGFloat, dy: CGFloat) {
-        x += dx; y += dy
+    /// Absolute move — exact regardless of event granularity or how far
+    /// the cursor jumps between events.
+    public mutating func dragTo(mouseScreen: CGPoint) {
+        x = mouseScreen.x - dragOffset.dx
+        y = mouseScreen.y - dragOffset.dy
         targetX = x; targetY = y
     }
 

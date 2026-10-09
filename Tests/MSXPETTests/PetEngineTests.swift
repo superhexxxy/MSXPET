@@ -40,13 +40,29 @@ final class PetEngineTests: XCTestCase {
     func testDragRoundTrip() {
         var e = PetEngine(x: 100, y: 100)
         let rect = CGRect(x: 0, y: 0, width: 1000, height: 800)
-        e.beginDrag()
+        e.beginDrag(mouseScreen: CGPoint(x: 110, y: 120)) // grab 10,20 into the pet
         XCTAssertEqual(e.state, .dragged)
-        e.dragBy(dx: 10, dy: 20)
-        XCTAssertEqual(e.x, 110, accuracy: 0.01)
+        e.dragTo(mouseScreen: CGPoint(x: 200, y: 300))
+        XCTAssertEqual(e.x, 190, accuracy: 0.001)
+        XCTAssertEqual(e.y, 280, accuracy: 0.001)
         e.endDrag(in: rect)
         XCTAssertEqual(e.state, .idle)
         XCTAssertFalse(e.dragging)
+    }
+
+    func testDragTracksExactlyOverDistantJumps() {
+        // Regression: window-relative deltas fell behind the cursor
+        // (emulated 620pt gap after a 1s fast pull). Absolute positioning
+        // is exact no matter how coarse the events are.
+        var e = PetEngine(x: 100, y: 100)
+        e.beginDrag(mouseScreen: CGPoint(x: 100, y: 100))
+        var mouse = CGPoint(x: 100, y: 100)
+        for _ in 0..<125 { // 1s of 125pt jumps — brutal event starvation
+            mouse.x += 125; mouse.y += 40
+            e.dragTo(mouseScreen: mouse)
+        }
+        XCTAssertEqual(e.x, mouse.x, accuracy: 0.001)
+        XCTAssertEqual(e.y, mouse.y, accuracy: 0.001)
     }
 
     func testChaseMovesTowardMouse() {

@@ -13,11 +13,18 @@ public final class PetView: NSView {
 
     private var alphaMask: (pixels: [UInt8], width: Int, height: Int)?
 
-    public var onDrag: ((CGFloat, CGFloat) -> Void)?
+    // Absolute screen-space drag (NSEvent.mouseLocation coords, Y-up —
+    // the same space PetEngine lives in). Deliberately NOT window-relative
+    // deltas: the window moves under the cursor during a drag, so deltas
+    // eat their own tail and the pet falls behind (measured 620pt gap
+    // after a 1s fast pull). Upstream was absolute too (XQueryPointer).
+    public var onDragStart: ((CGPoint) -> Void)?
+    public var onDragMove: ((CGPoint) -> Void)?
     public var onDragEnd: (() -> Void)?
     public var onClick: (() -> Void)?
-    private var dragStart: NSPoint?
+    private var downScreen: CGPoint?
     private var movedSinceDown = false
+    private static let clickThreshold: CGFloat = 3
 
     override public var isFlipped: Bool { true }
 
@@ -60,24 +67,26 @@ public final class PetView: NSView {
     }
 
     override public func mouseDown(with event: NSEvent) {
-        dragStart = event.locationInWindow
+        _ = event
+        downScreen = NSEvent.mouseLocation
         movedSinceDown = false
     }
 
     override public func mouseDragged(with event: NSEvent) {
-        guard let start = dragStart else { return }
-        let cur = event.locationInWindow
-        let dx = cur.x - start.x
-        let dy = -(cur.y - start.y) // window Y-up vs flipped view: dragging up = +screen Y
-        // NOTE: PetManager converts to screen delta; sign fixed there. Keep raw here.
-        if abs(dx) + abs(dy) > 1 { movedSinceDown = true }
-        onDrag?(cur.x - start.x, start.y - cur.y)
-        dragStart = cur
+        _ = event
+        guard let down = downScreen else { return }
+        let now = NSEvent.mouseLocation
+        if !movedSinceDown,
+           hypot(now.x - down.x, now.y - down.y) > Self.clickThreshold {
+            movedSinceDown = true
+            onDragStart?(down)
+        }
+        if movedSinceDown { onDragMove?(now) }
     }
 
     override public func mouseUp(with event: NSEvent) {
         _ = event
-        dragStart = nil
+        downScreen = nil
         if movedSinceDown { onDragEnd?() }
         else { onClick?() }
         movedSinceDown = false
