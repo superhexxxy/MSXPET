@@ -90,16 +90,20 @@ public final class PetManager {
 
     private func startLoop() {
         lastTick = Date()
-        timer = Timer.scheduledTimer(withTimeInterval: Config.tickInterval, repeats: true) { [weak self] _ in self?.tick() }
-        if let t = timer { RunLoop.main.add(t, forMode: .common) }
+        // Single registration in .common modes (fires during event tracking
+        // too). NOTE: don't use scheduledTimer + add(.common) — that registers
+        // the timer twice and risks double ticks.
+        let t = Timer(timeInterval: Config.tickInterval, repeats: true) { [weak self] _ in self?.tick() }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
     }
 
     private func tick() {
         let now = Date()
-        let dtMs = max(1, Int(now.timeIntervalSince(lastTick) * 1000))
+        let dtMs = min(max(1, Int(now.timeIntervalSince(lastTick) * 1000)), 100)
         lastTick = now
         let mouse = NSEvent.mouseLocation
-        engine.update(dtMs: min(dtMs, 100), mouse: mouse, visibleRect: visibleFrame())
+        engine.update(dtMs: dtMs, mouse: mouse, visibleRect: visibleFrame())
         updateAnimation(dtMs: dtMs)
         updateWindowPosition()
     }

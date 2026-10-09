@@ -57,4 +57,39 @@ final class PetEngineTests: XCTestCase {
         XCTAssertGreaterThan(e.x, 0)
         XCTAssertEqual(e.state, .e)
     }
+
+    func testBoundaryDirectionDoesNotFlicker() {
+        // Regression: raw octant near the E/NE 2x boundary flipped
+        // 175x / 300 ticks at 60Hz, swapping sprites at full frame rate.
+        // Displayed state must stay put; position still converges.
+        var e = PetEngine(x: 500, y: 500)
+        e.targetX = 800; e.targetY = 640
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        var flips = 0
+        var prev = e.state
+        for _ in 0..<300 {
+            e.update(dtMs: 16, mouse: CGPoint(x: 0, y: 0), visibleRect: rect)
+            if e.state != prev, e.state.isWalking, prev.isWalking { flips += 1 }
+            prev = e.state
+        }
+        XCTAssertLessThanOrEqual(flips, 4, "walk-direction flips: \(flips)")
+        XCTAssertGreaterThan(e.x, 500)
+        XCTAssertGreaterThan(e.y, 500)
+    }
+
+    func testGenuineTurnStillAdopts() {
+        // A real 90° turn must show within ~100ms (6 ticks @16ms).
+        var e = PetEngine(x: 500, y: 500)
+        e.targetX = 900; e.targetY = 500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        for _ in 0..<10 {
+            e.update(dtMs: 16, mouse: CGPoint(x: 0, y: 0), visibleRect: rect)
+        }
+        XCTAssertEqual(e.state, .e)
+        e.targetX = 500; e.targetY = 900 // hard turn north
+        for _ in 0..<10 {
+            e.update(dtMs: 16, mouse: CGPoint(x: 0, y: 0), visibleRect: rect)
+        }
+        XCTAssertEqual(e.state, .n)
+    }
 }

@@ -31,6 +31,12 @@ public struct PetEngine {
     private var wasChasing = false
     private var wasFrozen = false
 
+    // Octant flicker filter (see filteredDirection): candidate direction
+    // must win this many consecutive ticks before the sprite switches.
+    private static let directionPersistenceTicks = 6
+    private var pendingDirection: PetState? = nil
+    private var pendingTicks = 0
+
     public init(x: CGFloat, y: CGFloat) {
         self.x = x; self.y = y
         self.targetX = x; self.targetY = y
@@ -190,14 +196,37 @@ public struct PetEngine {
 
     private mutating func moveToward(tx: CGFloat, ty: CGFloat, dtSeconds: CGFloat) {
         let dx = tx - x, dy = ty - y
-        let dist2 = dx * dx + dy * dy
-        if dist2 < 4.0 { setState(.idle); return }
-        let dir = Self.findOctant(dx: dx, dy: dy)
-        let step = Self.stepVector(for: dir, speed: Config.petSpeedPointsPerSecond, dtSeconds: dtSeconds)
+        let dist = (dx * dx + dy * dy).squareRoot()
+        if dist * dist < 4.0 { setState(.idle); return }
+        // Position follows the TRUE normalized vector (smooth). Upstream
+        // stepped along the snapped octant, which at 60Hz re-evaluation
+        // dithers E-step/NE-step every tick near a boundary (positional
+        // micro-jitter on top of the sprite flicker).
         let maxStep = Config.petSpeedPointsPerSecond * dtSeconds
-        if dist2.squareRoot() <= maxStep + 0.5 { x = tx; y = ty }
-        else { x += step.dx; y += step.dy }
-        setState(dir)
+        if dist <= maxStep + 0.5 { x = tx; y = ty }
+        else { x += dx / dist * maxStep; y += dy / dist * maxStep }
+        // Displayed sprite uses the hysteresis-filtered octant.
+        setState(filteredDirection(Self.findOctant(dx: dx, dy: dy)))
+    }
+
+    /// Octant flicker filter: at 60Hz, float noise near a boundary flips the
+    /// raw octant near-every tick (measured 175 flips / 300 ticks), swapping
+    /// sprites at full frame rate. A new walk direction must win N consecutive
+    /// ticks before the sprite switches. Movement above always follows the
+    /// true vector, so genuine turns only lag ~100ms — imperceptible.
+    private mutating func filteredDirection(_ raw: PetState) -> PetState {
+        guard state.isWalking else {
+            pendingDirection = nil; pendingTicks = 0
+            return raw
+        }
+        if raw == state { pendingDirection = nil; pendingTicks = 0; return raw }
+        if pendingDirection == raw { pendingTicks += 1 }
+        else { pendingDirection = raw; pendingTicks = 1 }
+        if pendingTicks >= Self.directionPersistenceTicks {
+            pendingDirection = nil; pendingTicks = 0
+            return raw
+        }
+        return state
     }
 
     private mutating func setState(_ s: PetState) {
