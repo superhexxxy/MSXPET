@@ -6,7 +6,7 @@ import Foundation
 // MARK: - Sound cues (engine raises them; SoundManager plays them)
 
 public enum SoundEvent: String, CaseIterable {
-    case grab, happy, land, pounce, laserOn, laserOff, wake
+    case grab, happy, land, pounce, laserOn, laserOff, wake, purr
 }
 // MARK: - Sleeping Zzz particles (PetView draws them; view coords: y-down)
 

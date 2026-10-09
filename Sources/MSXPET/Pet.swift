@@ -21,6 +21,9 @@ public final class Pet {
 
     public var petName: String
 
+    /// Sound outlet: PetManager connects this to SoundManager.play.
+    public var soundHandler: ((SoundEvent) -> Void)?
+
     public init(petName: String, frames: [PetState: [NSImage]], at origin: CGPoint) {
         self.petName = petName
         self.frames = frames
@@ -104,6 +107,10 @@ public final class Pet {
 
     public func tick(dtMs: Int, mouse: CGPoint, visibleRect: CGRect) {
         engine.update(dtMs: dtMs, mouse: mouse, visibleRect: visibleRect)
+        if let cue = engine.soundCue {
+            engine.soundCue = nil
+            soundHandler?(cue)
+        }
         showBubbleIfNew()
         zzz.update(dtMs: dtMs, active: engine.state == .sleeping)
         view.zzz = zzz.parts

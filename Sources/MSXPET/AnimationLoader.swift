@@ -7,7 +7,7 @@ import Foundation
 
 public enum AnimationLoader {
     public static func loadFrames(petName: String, state: PetState) -> [NSImage] {
-        for base in resourceBases() {
+        for base in AppResources.bases() {
             // Try: <base>/pets/<pet>/<state>/0.png, 1.png ...
             var frames: [NSImage] = []
             for i in 0..<64 {
@@ -47,8 +47,12 @@ public enum AnimationLoader {
         img.unlockFocus()
         return [img]
     }
+}
 
-    private static func resourceBases() -> [URL] {
+/// Shared resource lookup: .app bundle first, then SwiftPM module bundle,
+/// then dev-checkout fallbacks. Used by animation, sound, and overlays.
+public enum AppResources {
+    public static func bases() -> [URL] {
         var bases: [URL] = []
         if let r = Bundle.main.resourceURL { bases.append(r) }
         #if SWIFT_PACKAGE

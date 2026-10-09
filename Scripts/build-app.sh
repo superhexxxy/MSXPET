@@ -17,6 +17,12 @@ fi
 if [[ -d Sources/MSXPET/Resources/pets ]]; then
   cp -R Sources/MSXPET/Resources/pets "$APP/Contents/Resources/"
 fi
+if [[ -d Sources/MSXPET/Resources/sounds ]]; then
+  cp -R Sources/MSXPET/Resources/sounds "$APP/Contents/Resources/"
+fi
+if [[ -d Sources/MSXPET/Resources/overlays ]]; then
+  cp -R Sources/MSXPET/Resources/overlays "$APP/Contents/Resources/"
+fi
 codesign --force --deep --sign - "$APP"
 echo "Built $APP"
 

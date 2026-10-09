@@ -12,6 +12,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var countItems: [Int: NSMenuItem] = [:]
     private var loginItem: NSMenuItem?
     private var laserItem: NSMenuItem?
+    private var soundItem: NSMenuItem?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         _ = notification
@@ -65,6 +66,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         laserItem = NSMenuItem(title: "Laser Pointer", action: #selector(toggleLaser), keyEquivalent: "l")
         laserItem?.target = self
         menu.addItem(laserItem!)
+        soundItem = NSMenuItem(title: "Sound", action: #selector(toggleSound), keyEquivalent: "")
+        soundItem?.target = self
+        soundItem?.state = (manager?.soundEnabled ?? true) ? .on : .off
+        menu.addItem(soundItem!)
+        let soundsMenu = NSMenu()
+        let reveal = NSMenuItem(title: "Reveal Sounds Folder…", action: #selector(revealSounds), keyEquivalent: "")
+        reveal.target = self
+        soundsMenu.addItem(reveal)
+        let customRoot = NSMenuItem(title: "Custom Sounds", action: nil, keyEquivalent: "")
+        customRoot.submenu = soundsMenu
+        menu.addItem(customRoot)
         menu.addItem(.separator())
 
         let rename = NSMenuItem(title: "Rename…", action: #selector(rename), keyEquivalent: "")
@@ -103,6 +115,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         manager?.setLaser(on)
         laserItem?.state = on ? .on : .off
     }
+    @objc private func toggleSound() {
+        let on = !(manager?.soundEnabled ?? true)
+        manager?.setSound(on)
+        soundItem?.state = on ? .on : .off
+    }
+    @objc private func revealSounds() { SoundManager.revealFolder() }
     @objc private func rename() {
         let alert = NSAlert()
         alert.messageText = "Name your pet"

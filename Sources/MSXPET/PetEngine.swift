@@ -27,6 +27,9 @@ public struct PetEngine {
     public var dragging = false
     public var speech: String? = nil
 
+    // One-shot sound request, raised at trigger points and consumed by Pet.
+    public var soundCue: SoundEvent? = nil
+
     // Mood 0...100. Pets (clicks) raise it; neglect decays it. High mood =
     // zoomies, low mood = sleepy. Never shown as UI — only behaviour.
     public var mood: CGFloat = 70
@@ -132,6 +135,7 @@ public struct PetEngine {
         setState(.dragged)
         speech = ["hey!", "hup!", "heave-ho!"].randomElement()
         speechTimeMs = 0
+        soundCue = .grab
     }
 
     /// Absolute move — exact regardless of event granularity or how far
@@ -185,6 +189,7 @@ public struct PetEngine {
             if wasFrozenLocal { unfreezeDelayMs = Config.unfreezeDelayMs }
             speech = wasAsleep ? "nyawn… fine, I'M UP" : "can't catch me!"
             speechTimeMs = 0
+            if wasAsleep { soundCue = .wake }
         } else {
             pickRandomDestination(in: rect, margin: Config.wanderMargin)
             setState(.idle)
@@ -197,7 +202,7 @@ public struct PetEngine {
         if frozen { setState(.idle); frozenTimeMs = 0 }
         else {
             unfreezeDelayMs = Config.unfreezeDelayMs; setState(.idle)
-            if wasAsleep { speech = "nyawn…"; speechTimeMs = 0 }
+            if wasAsleep { speech = "nyawn…"; speechTimeMs = 0; soundCue = .wake }
         }
     }
 
@@ -212,6 +217,7 @@ public struct PetEngine {
             if mood >= 85 { phrase += " ♥" }
             speech = phrase
             speechTimeMs = 0
+            soundCue = .happy
         }
     }
 
@@ -296,6 +302,7 @@ public struct PetEngine {
                 setState(.idle)
                 speech = "whee!"
                 speechTimeMs = 0
+                soundCue = .land
                 return
             }
         }
@@ -318,6 +325,7 @@ public struct PetEngine {
         playCooldownMs = Int.random(in: 8_000...20_000)
         speech = "!"
         speechTimeMs = 0
+        soundCue = .pounce
     }
 
     /// Another pet (or the manager) invites this one to chase a point.

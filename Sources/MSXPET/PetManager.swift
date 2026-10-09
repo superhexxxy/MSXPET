@@ -7,6 +7,7 @@ import Foundation
 public final class PetManager {
     private var pets: [Pet] = []
     private let laser = LaserDot()
+    private let sound = SoundManager()
     private var timer: Timer?
     private var lastTick = Date()
     private var currentInterval: TimeInterval = Config.tickInterval
@@ -66,7 +67,9 @@ public final class PetManager {
                        CGPoint(x: v.midX - 120, y: v.midY + 60),
                        CGPoint(x: v.midX + 120, y: v.midY - 60)]
         for i in 0..<count {
-            pets.append(Pet(petName: petName, frames: frames(for: petName), at: origins[i]))
+            let pet = Pet(petName: petName, frames: frames(for: petName), at: origins[i])
+            pet.soundHandler = { [weak self] cue in self?.sound.play(cue) }
+            pets.append(pet)
         }
     }
 
@@ -115,7 +118,17 @@ public final class PetManager {
             }
         }
         if !on { laser.hide() }
+        sound.play(on ? .laserOn : .laserOff)
         poke()
+    }
+
+    // MARK: - Sound
+
+    public var soundEnabled: Bool { sound.enabled }
+
+    public func setSound(_ on: Bool) {
+        sound.enabled = on
+        if !on { sound.stopAll() }
     }
 
     // MARK: - Power: pause while locked/asleep (zero CPU while away)
@@ -141,6 +154,7 @@ public final class PetManager {
         systemPaused = paused
         if paused {
             timer?.invalidate(); timer = nil
+            sound.setPurr(false) // no purring to an empty locked room
         } else {
             lastTick = Date()
             startLoop()
@@ -201,6 +215,8 @@ public final class PetManager {
         }
         separatePets()
         for p in pets { p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible) }
+        // Sleep purr: one shared loop while ANY pet dozes (idempotent).
+        sound.setPurr(pets.contains { $0.engine.state == .sleeping })
         maybeSocialPlay(dtMs: dtMs)
         let want = desiredInterval()
         if abs(want - currentInterval) > 0.001, !systemPaused {
