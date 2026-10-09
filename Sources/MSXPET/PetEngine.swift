@@ -43,11 +43,24 @@ public struct PetEngine {
     private var fallVelocity = CGVector(dx: 0, dy: 0)
     private var bounces = 0
 
+    // Wall-cling: flung into an edge → scramble, slide, slip or (rarely)
+    // recover. Sides + top only; the floor is for landing.
+    public var clinging = false
+    private enum ClingEdge { case left, right, top }
+    private var clingEdge = ClingEdge.left
+    private var clingTimeMs = 0
+    private var clingDurationMs = 2000
+    private var scramblePhase = 0
+
     // Social / play targeting: chase a point (cursor pounce or another pet)
     // for a while, then resume wandering. Uses the walk states — no new art.
     private var socialTarget: CGPoint? = nil
     private var socialUntilMs = 0
     private var playCooldownMs = 6000
+
+    // Laser catch cooldown (per pet so a clowder doesn't spam in unison).
+    private var catchCooldownMs = 0
+    public var catchReady: Bool { catchCooldownMs <= 0 }
 
     // Laser target override (manager sets mouse + formation offset per pet).
     // When chasing and set, the pet hunts this instead of the raw cursor.
@@ -131,6 +144,7 @@ public struct PetEngine {
         wasChasing = chasing; wasFrozen = frozen
         dragging = true; frozen = true; chasing = false
         falling = false
+        clinging = false
         dragOffset = CGVector(dx: mouseScreen.x - x, dy: mouseScreen.y - y)
         setState(.dragged)
         speech = ["hey!", "hup!", "heave-ho!"].randomElement()
@@ -237,6 +251,7 @@ public struct PetEngine {
             moodDecayAccumMs = 0
             mood = max(0, mood - 2)
         }
+        if catchCooldownMs > 0 { catchCooldownMs -= dtMs }
         // happy expiry
         if state == .happy {
             happyTimeMs += dtMs
@@ -279,6 +294,10 @@ public struct PetEngine {
     // MARK: - Drop physics
 
     private mutating func updateFall(dtMs: Int, visibleRect: CGRect) {
+        if clinging {
+            updateCling(dtMs: dtMs, visibleRect: visibleRect)
+            return
+        }
         let dtS = CGFloat(dtMs) / 1000.0
         fallVelocity.dy = max(-1400, fallVelocity.dy - 2200 * dtS)
         x += fallVelocity.dx * dtS
@@ -286,7 +305,17 @@ public struct PetEngine {
         let floorY = visibleRect.minY + Config.petSize / 2
         let minX = visibleRect.minX + Config.petSize / 2
         let maxX = visibleRect.maxX - Config.petSize / 2
-        x = min(max(x, minX), maxX)
+        let ceilY = visibleRect.maxY - Config.petSize / 2
+        // Edge contact with inward speed → grab on (sides + top only).
+        if x <= minX {
+            x = minX
+            if fallVelocity.dx < -150 { startCling(.left); return }
+            fallVelocity.dx = 0
+        } else if x >= maxX {
+            x = maxX
+            if fallVelocity.dx > 150 { startCling(.right); return }
+            fallVelocity.dx = 0
+        }
         if y <= floorY {
             y = floorY
             if abs(fallVelocity.dy) > 220, bounces < 2 {
@@ -294,23 +323,84 @@ public struct PetEngine {
                 fallVelocity.dx *= 0.5
                 bounces += 1
             } else {
-                // Landed. That was fun.
-                falling = false
-                bounces = 0
-                mood = min(100, mood + 5)
-                pickRandomDestination(in: visibleRect, margin: Config.wanderMargin)
-                setState(.idle)
-                speech = "whee!"
-                speechTimeMs = 0
-                soundCue = .land
+                land(in: visibleRect)
                 return
             }
         }
-        if y > visibleRect.maxY - Config.petSize / 2 {
-            y = visibleRect.maxY - Config.petSize / 2
+        if y >= ceilY {
+            y = ceilY
+            if fallVelocity.dy > 150 { startCling(.top); return }
             fallVelocity.dy = 0
         }
         setState(.dragged) // splayed limbs double as the falling pose
+    }
+
+    private mutating func land(in visibleRect: CGRect) {
+        falling = false
+        clinging = false
+        bounces = 0
+        mood = min(100, mood + 5)
+        pickRandomDestination(in: visibleRect, margin: Config.wanderMargin)
+        setState(.idle)
+        speech = "whee!"
+        speechTimeMs = 0
+        soundCue = .land
+    }
+
+    private mutating func startCling(_ edge: ClingEdge) {
+        clinging = true
+        clingEdge = edge
+        clingTimeMs = 0
+        scramblePhase = 0
+        clingDurationMs = Int.random(in: 1500...2500)
+        fallVelocity.dx = 0
+        fallVelocity.dy = 0
+        setState(.dragged)
+        speech = "!"
+        speechTimeMs = 0
+        soundCue = .pounce
+    }
+
+    private mutating func updateCling(dtMs: Int, visibleRect: CGRect) {
+        clingTimeMs += dtMs
+        scramblePhase += dtMs
+        let dtS = CGFloat(dtMs) / 1000.0
+        let j: CGFloat = (scramblePhase / 120) % 2 == 0 ? 1 : -1
+        let floorY = visibleRect.minY + Config.petSize / 2
+        switch clingEdge {
+        case .left:
+            x = visibleRect.minX + Config.petSize / 2 + j
+            // Grip fails over time: slides faster and faster.
+            y -= (20 + 90 * CGFloat(clingTimeMs) / CGFloat(clingDurationMs)) * dtS
+        case .right:
+            x = visibleRect.maxX - Config.petSize / 2 + j
+            y -= (20 + 90 * CGFloat(clingTimeMs) / CGFloat(clingDurationMs)) * dtS
+        case .top:
+            y = visibleRect.maxY - Config.petSize / 2
+            x += j * 0.5 // dangling swing
+        }
+        setState(.dragged)
+        // Slid all the way down: that's a landing.
+        if clingEdge != .top, y <= floorY {
+            y = floorY
+            land(in: visibleRect)
+            return
+        }
+        guard clingTimeMs >= clingDurationMs else { return }
+        if Double.random(in: 0...1) < 0.15 {
+            // RARE RECOVERY: kicks off back into the room, still airborne.
+            switch clingEdge {
+            case .left: fallVelocity = CGVector(dx: 240, dy: 120)
+            case .right: fallVelocity = CGVector(dx: -240, dy: 120)
+            case .top: fallVelocity = CGVector(dx: Bool.random() ? 200 : -200, dy: 60)
+            }
+            clinging = false
+            speech = "phew."
+            speechTimeMs = 0
+        } else {
+            // Grip fails — gravity resumes next tick.
+            clinging = false
+        }
     }
 
     // MARK: - Cursor pounce
@@ -326,6 +416,23 @@ public struct PetEngine {
         speech = "!"
         speechTimeMs = 0
         soundCue = .pounce
+    }
+
+    /// Laser catch! The pet bats the dot with its paws (happy frames),
+    /// hops toward it, then resumes the hunt when the flash expires.
+    public mutating func playCatch(toward point: CGPoint) {
+        previousState = state.isWalking ? state : .e
+        setState(.happy)
+        happyTimeMs = 0
+        let dx = point.x - x, dy = point.y - y
+        let d = max(1, hypot(dx, dy))
+        x += dx / d * 6
+        y += dy / d * 6
+        targetX = x; targetY = y
+        mood = min(100, mood + 3)
+        if Bool.random() { speech = "gotcha!"; speechTimeMs = 0 }
+        soundCue = .happy
+        catchCooldownMs = Int.random(in: 3000...6000)
     }
 
     /// Another pet (or the manager) invites this one to chase a point.

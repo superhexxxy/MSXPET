@@ -14,6 +14,8 @@ public final class Pet {
     private var recentMoves: [(CGPoint, Date)] = []
 
     private var frames: [PetState: [NSImage]]
+    private var anchors: [PetState: [CGPoint]] = [:]
+    private var refAnchor = CGPoint(x: 16, y: 4)
     private var frameIndex = 0
     private var frameAccumMs = 0
     private var lastState: PetState = .idle
@@ -24,9 +26,11 @@ public final class Pet {
     /// Sound outlet: PetManager connects this to SoundManager.play.
     public var soundHandler: ((SoundEvent) -> Void)?
 
-    public init(petName: String, frames: [PetState: [NSImage]], at origin: CGPoint) {
+    public init(petName: String, assets: ([PetState: [NSImage]], [PetState: [CGPoint]], CGPoint), at origin: CGPoint) {
         self.petName = petName
-        self.frames = frames
+        self.frames = assets.0
+        self.anchors = assets.1
+        self.refAnchor = assets.2
         engine = PetEngine(x: origin.x, y: origin.y)
         window = PetWindow(contentRect: NSRect(x: origin.x - 32, y: origin.y - 32,
                                               width: Config.petSize, height: Config.petSize))
@@ -50,8 +54,10 @@ public final class Pet {
         window.orderOut(nil)
     }
 
-    public func setFrames(_ frames: [PetState: [NSImage]], petName: String) {
+    public func setFrames(_ frames: [PetState: [NSImage]], anchors: [PetState: [CGPoint]], ref: CGPoint, petName: String) {
         self.frames = frames
+        self.anchors = anchors
+        self.refAnchor = ref
         self.petName = petName
         frameIndex = 0; frameAccumMs = 0
     }
@@ -150,6 +156,12 @@ public final class Pet {
         }
         let next = list[frameIndex % list.count]
         if view.currentImage !== next { view.currentImage = next }
+        // Ride the head-bobble: shift overlays by this frame's anchor delta.
+        if let alist = anchors[s], !alist.isEmpty {
+            let a = alist[frameIndex % alist.count]
+            view.overlayShift = CGVector(dx: (a.x - refAnchor.x) * 2,
+                                         dy: (a.y - refAnchor.y) * 2)
+        }
     }
 
     private func updateWindowPosition() {

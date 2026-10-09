@@ -218,12 +218,25 @@ final class PetEngineTests: XCTestCase {
         XCTAssertLessThan(z.parts[0].y, y0)
     }
 
-    func testHatSeasonsRetired() {
-        // Procedural hats were deleted in favour of the overlay system;
-        // seasonal gating now lives in overlay meta (decoded as JSON).
-        let meta = #"{"months": [12]}"#.data(using: .utf8)!
-        let json = try! JSONSerialization.jsonObject(with: meta) as! [String: Any]
-        XCTAssertEqual(json["months"] as! [Int], [12])
+    func testHeadAnchorFindsTop() {
+        // Regression: the pixel reader once assumed bottom-up buffers and
+        // tracked FEET instead of heads. Programmatic image, no fixtures.
+        let img = NSImage(size: NSSize(width: 32, height: 32))
+        img.lockFocus()
+        NSColor.white.setFill()
+        // lockFocus origin is bottom-left: y 20..26 => rows 6..12 from top.
+        NSRect(x: 10, y: 20, width: 12, height: 6).fill()
+        img.unlockFocus()
+        let a = HeadAnchor.of(img)
+        XCTAssertEqual(a.y, 6, accuracy: 0.6)
+        XCTAssertEqual(a.x, 16, accuracy: 0.6)
+    }
+
+    func testEnabledOverlaysHaveNoGating() {
+        // Product rule: enabled = displayed. Overlay carries no
+        // seasons/species fields anymore — just a name and an image.
+        let o = Overlay(name: "x", image: NSImage(size: NSSize(width: 1, height: 1)))
+        XCTAssertEqual(o.name, "x")
     }
 
     func testLaserFormationDistinct() {
@@ -249,5 +262,34 @@ final class PetEngineTests: XCTestCase {
         e.hourOverride = 12
         e.beginDrag(mouseScreen: CGPoint(x: 500, y: 500))
         XCTAssertEqual(e.soundCue, .grab)
+    }
+
+    func testWallClingThenSettle() {
+        var e = PetEngine(x: 1000, y: 1200)
+        e.hourOverride = 12
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        e.beginDrag(mouseScreen: CGPoint(x: 1000, y: 1200))
+        e.endDrag(in: rect, releaseVelocity: CGVector(dx: -800, dy: 50))
+        var clung = false
+        var settled = false
+        for _ in 0..<3000 {
+            e.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+            if e.clinging { clung = true }
+            if !e.falling && !e.clinging && e.state == .idle && e.y <= 33 {
+                settled = true; break
+            }
+        }
+        XCTAssertTrue(clung, "must grab the wall")
+        XCTAssertTrue(settled, "must end settled")
+    }
+
+    func testLaserCatchFlash() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.chasing = true
+        XCTAssertTrue(e.catchReady)
+        e.playCatch(toward: CGPoint(x: 510, y: 505))
+        XCTAssertEqual(e.state, .happy)
+        XCTAssertFalse(e.catchReady)
     }
 }

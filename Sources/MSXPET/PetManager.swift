@@ -14,8 +14,14 @@ public final class PetManager {
     private var systemPaused = false
     private var playCheckAccumMs = 0
 
-    // Shared frame cache so 3 nekos don't triple image memory.
-    private var frameCache: [String: [PetState: [NSImage]]] = [:]
+    // Shared asset cache so 3 nekos don't triple image memory.
+    // Anchors ride alongside frames for overlay head-tracking.
+    private struct PetAssets {
+        var frames: [PetState: [NSImage]]
+        var anchors: [PetState: [CGPoint]]
+        var ref: CGPoint
+    }
+    private var assetCache: [String: PetAssets] = [:]
 
     // Accessories (overlay layers). User-enabled set persisted.
     private var allOverlays: [Overlay] = []
@@ -54,17 +60,22 @@ public final class PetManager {
 
     // MARK: - Clowder management
 
-    private func frames(for name: String) -> [PetState: [NSImage]] {
-        if let cached = frameCache[name] { return cached }
-        var dict: [PetState: [NSImage]] = [:]
+    private func assets(for name: String) -> PetAssets {
+        if let cached = assetCache[name] { return cached }
+        var frames: [PetState: [NSImage]] = [:]
+        var anchors: [PetState: [CGPoint]] = [:]
         for s in PetState.allCases {
             let loaded = AnimationLoader.loadFrames(petName: name, state: s)
-            dict[s] = loaded.isEmpty
+            let list = loaded.isEmpty
                 ? AnimationLoader.placeholderFrames(for: s, size: Config.petSize)
                 : loaded
+            frames[s] = list
+            anchors[s] = list.map { HeadAnchor.of($0) }
         }
-        frameCache[name] = dict
-        return dict
+        let ref = anchors[.idle]?.first ?? CGPoint(x: 16, y: 4)
+        let assets = PetAssets(frames: frames, anchors: anchors, ref: ref)
+        assetCache[name] = assets
+        return assets
     }
 
     private func spawnPets(count: Int) {
@@ -72,8 +83,9 @@ public final class PetManager {
         let origins = [CGPoint(x: v.midX, y: v.midY),
                        CGPoint(x: v.midX - 120, y: v.midY + 60),
                        CGPoint(x: v.midX + 120, y: v.midY - 60)]
+        let a = assets(for: petName)
         for i in 0..<count {
-            let pet = Pet(petName: petName, frames: frames(for: petName), at: origins[i])
+            let pet = Pet(petName: petName, assets: (a.frames, a.anchors, a.ref), at: origins[i])
             pet.soundHandler = { [weak self] cue in self?.sound.play(cue) }
             pets.append(pet)
         }
@@ -92,8 +104,8 @@ public final class PetManager {
     public func switchPet(_ name: String) {
         petName = name
         UserDefaults.standard.set(name, forKey: Config.selectedPetKey)
-        let f = frames(for: name)
-        for p in pets { p.setFrames(f, petName: name) }
+        let a = assets(for: name)
+        for p in pets { p.setFrames(a.frames, anchors: a.anchors, ref: a.ref, petName: name) }
         poke()
     }
 
@@ -114,10 +126,8 @@ public final class PetManager {
         poke()
     }
 
-    private func activeOverlays(for petName: String, month: Int) -> [Overlay] {
-        allOverlays.filter {
-            enabledOverlays.contains($0.name) && $0.suits(petName: petName, month: month)
-        }
+    private func activeOverlays() -> [Overlay] {
+        allOverlays.filter { enabledOverlays.contains($0.name) }
     }
 
     // MARK: - Shared actions (chaos applies to everyone)
@@ -236,17 +246,22 @@ public final class PetManager {
                 p.engine.frozen = false
                 let off = LaserFormation.offset(index: i, count: pets.count,
                                                 timeSeconds: t)
-                p.engine.laserTarget = CGPoint(x: mouse.x + off.dx,
-                                               y: mouse.y + off.dy)
+                let target = CGPoint(x: mouse.x + off.dx, y: mouse.y + off.dy)
+                p.engine.laserTarget = target
+                // Caught it! Bat the dot, celebrate, resume the hunt.
+                let dx = target.x - p.engine.x, dy = target.y - p.engine.y
+                if dx * dx + dy * dy < 24 * 24, p.engine.catchReady {
+                    p.engine.playCatch(toward: target)
+                }
             }
         } else {
             for p in pets { p.engine.laserTarget = nil }
         }
         separatePets()
-        let month = Calendar.current.component(.month, from: Date())
+        let overlays = activeOverlays()
         for p in pets {
             p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible)
-            p.applyOverlays(activeOverlays(for: p.petName, month: month))
+            p.applyOverlays(overlays)
         }
         // Sleep purr: one shared loop while ANY pet dozes (idempotent).
         sound.setPurr(pets.contains { $0.engine.state == .sleeping })

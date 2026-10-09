@@ -38,13 +38,24 @@ public final class PetView: NSView {
         didSet { needsDisplay = true }
     }
 
+    /// Head-tracking shift in 32px art units (y-down, like the canvas).
+    /// Pet sets this per animation frame so hats ride the bobble.
+    public var overlayShift = CGVector.zero {
+        didSet {
+            if overlayShift != oldValue { needsDisplay = true }
+        }
+    }
+
     override public func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         dirtyRect.fill()
         // Crisp pixel-art on Retina: no smoothing on upscale 32px -> 64pt.
         NSGraphicsContext.current?.imageInterpolation = .none
         currentImage?.draw(in: bounds)
-        for o in overlays { o.image.draw(in: bounds) }
+        let r = NSRect(x: bounds.origin.x + overlayShift.dx * 2,
+                       y: bounds.origin.y + overlayShift.dy * 2,
+                       width: bounds.width, height: bounds.height)
+        for o in overlays { o.image.draw(in: r) }
         drawZzz()
     }
 
@@ -81,9 +92,9 @@ public final class PetView: NSView {
         let fy = point.y / max(bounds.height, 1) * CGFloat(mask.height)
         let px = Int(fx), py = Int(fy)
         guard px >= 0, py >= 0, px < mask.width, py < mask.height else { return nil }
-        // CoreGraphics buffer is bottom-up; view is flipped (top-down) -> flip row
-        let row = mask.height - 1 - py
-        let offset = (row * mask.width + px) * 4 + 3
+        // Both the pixel buffer (verified byte-for-byte: row 0 = image top)
+        // and this flipped view are top-down — no row flip.
+        let offset = (py * mask.width + px) * 4 + 3
         if mask.pixels[offset] > 20 { return super.hitTest(point) }
         return nil // click-through to desktop
     }

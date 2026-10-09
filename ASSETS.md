@@ -6,15 +6,13 @@ No rebuild needed for any of this: drop files in, hit reload in the 🐾 menu.
 
 An accessory is a folder with a full-canvas **32×32 RGBA PNG** drawn over
 the sprite, pixel-aligned (same canvas as the pets, so anything you draw
-lines up with the cat exactly):
+lines up with the cat exactly). Simple rule: **ticked on = displayed** —
+no seasons, no per-pet gating, no surprises:
 
 ```
 MyHat/
   overlay.png   # 32x32, transparent everywhere except the accessory
-  meta.json     # optional gating:
-                # { "months": [12] }            — December only
-                # { "species": ["neko"] }       — neko only
-                # {}                            — always, everyone
+  meta.json     # optional, currently just {} (reserved for later)
 ```
 
 Two homes (user folder wins on name clashes):
@@ -37,8 +35,9 @@ Making one (5 minutes, free):
 4. Regenerate the bundled set any time: `python3 Tools/make_overlays.py`
    (sources are shapes+rects in that script — fork it freely).
 
-Shipped accessories: `santa_hat` (December), `witch_hat` (October),
-`shades` (neko, year-round).
+Shipped accessories: `santa_hat`, `witch_hat`, `shades` — all opt-in
+from the Accessories menu. Overlays track the head: each frame's anchor
+is measured at load, so hats ride the walk-cycle bobble automatically.
 
 ## Sounds
 

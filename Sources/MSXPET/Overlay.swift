@@ -1,4 +1,5 @@
 // Overlay: full-canvas 32x32 accessory layers drawn over the sprite.
+// Simple rule: enabled = displayed. No seasons, no species gating.
 // Sources: bundled Resources/overlays/<name>/{overlay.png, meta.json}
 // plus ~/Library/Application Support/MSXPET/Overlays/<name>/ (user wins).
 
@@ -8,17 +9,9 @@ import Foundation
 public struct Overlay: Equatable {
     public var name: String
     public var image: NSImage
-    public var months: [Int]?   // nil = year-round
-    public var species: [String]? // nil = all pets
 
     public static func == (lhs: Overlay, rhs: Overlay) -> Bool {
         lhs.name == rhs.name
-    }
-
-    public func suits(petName: String, month: Int) -> Bool {
-        if let m = months, !m.contains(month) { return false }
-        if let s = species, !s.contains(petName) { return false }
-        return true
     }
 }
 
@@ -49,15 +42,7 @@ public enum OverlayLoader {
                   isDir.boolValue else { continue }
             let imgURL = folder.appendingPathComponent("overlay.png")
             guard let image = NSImage(contentsOf: imgURL) else { continue }
-            var months: [Int]? = nil
-            var species: [String]? = nil
-            if let data = try? Data(contentsOf: folder.appendingPathComponent("meta.json")),
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                months = json["months"] as? [Int]
-                species = json["species"] as? [String]
-            }
-            dict[name] = Overlay(name: name, image: image,
-                                 months: months, species: species)
+            dict[name] = Overlay(name: name, image: image)
         }
     }
 
@@ -65,5 +50,52 @@ public enum OverlayLoader {
         try? FileManager.default.createDirectory(at: userDir,
                                                  withIntermediateDirectories: true)
         NSWorkspace.shared.open(userDir)
+    }
+}
+
+/// Head-tracking anchor: the head bobs ±3px between animation frames while
+/// overlays are static sheets — without correction hats float off mid-stride
+/// (measured walk_east x: 13 → 9.5). The anchor (topmost opaque band centroid)
+/// is precomputed once per frame; overlays shift by (frame − reference).
+/// Coordinates: 32px art space, y-down from top.
+public enum HeadAnchor {
+    public static func of(_ image: NSImage) -> CGPoint {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+            return CGPoint(x: 16, y: 0)
+        }
+        return averageAnchor(w: cg.width, h: cg.height, image: cg)
+    }
+
+    private static func averageAnchor(w: Int, h: Int, image: CGImage) -> CGPoint {
+        var rgba = [UInt8](repeating: 0, count: w * h * 4)
+        let cs = CGColorSpaceCreateDeviceRGB()
+        let info = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+        var ok = false
+        rgba.withUnsafeMutableBytes { ptr in
+            if let ctx = CGContext(data: ptr.baseAddress, width: w, height: h,
+                                   bitsPerComponent: 8, bytesPerRow: w * 4,
+                                   space: cs, bitmapInfo: info.rawValue) {
+                ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+                ok = true
+            }
+        }
+        guard ok else { return CGPoint(x: CGFloat(w) / 2, y: 0) }
+        // NOTE: empirically, buffers drawn this way are TOP-down
+        // (row 0 = image top) — verified byte-for-byte against PIL.
+        // Do NOT flip: ty == buffer row.
+        var minY = h
+        for ty in 0..<h {
+            for x in 0..<w where rgba[(ty * w + x) * 4 + 3] > 20 {
+                minY = min(minY, ty)
+            }
+        }
+        var sumX = 0, n = 0
+        for ty in minY...min(minY + 2, h - 1) {
+            for x in 0..<w where rgba[(ty * w + x) * 4 + 3] > 20 {
+                sumX += x; n += 1
+            }
+        }
+        guard n > 0 else { return CGPoint(x: CGFloat(w) / 2, y: 0) }
+        return CGPoint(x: CGFloat(sumX) / CGFloat(n), y: CGFloat(minY))
     }
 }
