@@ -10,6 +10,9 @@ public enum PetState: Int, CaseIterable, Equatable {
     case nw, ne, sw, se
     case dragged
     case happy
+    case swat
+    case clingSide
+    case clingTop
 
     /// Directory name under Resources/pets/<pet>/<state>/ (matches upstream).
     public var assetDirectoryName: String {
@@ -26,6 +29,19 @@ public enum PetState: Int, CaseIterable, Equatable {
         case .se: return "walk_southeast"
         case .dragged: return "dragged"
         case .happy: return "happy"
+        case .swat: return "swat"
+        case .clingSide: return "cling_side"
+        case .clingTop: return "cling_top"
+        }
+    }
+
+    /// Fallback when a pet lacks frames for a state (e.g. dog has no swat
+    /// art): reuse the closest pose of the SAME pet. Never placeholders.
+    public var fallbackState: PetState? {
+        switch self {
+        case .swat: return .happy
+        case .clingSide, .clingTop: return .dragged
+        default: return nil
         }
     }
 

@@ -23,6 +23,11 @@ public final class Pet {
 
     public var petName: String
 
+    /// Personal laser-ring phase. Advances only while far from the dot, so
+    /// the target steadies at close range and catches actually land instead
+    /// of orbiting forever at full speed.
+    public var laserPhase: CGFloat = 0
+
     /// Sound outlet: PetManager connects this to SoundManager.play.
     public var soundHandler: ((SoundEvent) -> Void)?
 
@@ -156,11 +161,14 @@ public final class Pet {
         }
         let next = list[frameIndex % list.count]
         if view.currentImage !== next { view.currentImage = next }
-        // Ride the head-bobble: shift overlays by this frame's anchor delta.
+        view.overlayState = s.assetDirectoryName
+        // Bobble delta only: translation of this frame vs the state's
+        // first frame. (Absolute placement comes from variant art, not math.)
         if let alist = anchors[s], !alist.isEmpty {
             let a = alist[frameIndex % alist.count]
-            view.overlayShift = CGVector(dx: (a.x - refAnchor.x) * 2,
-                                         dy: (a.y - refAnchor.y) * 2)
+            let a0 = alist[0]
+            view.overlayShift = CGVector(dx: (a.x - a0.x) * 2,
+                                         dy: (a.y - a0.y) * 2)
         }
     }
 

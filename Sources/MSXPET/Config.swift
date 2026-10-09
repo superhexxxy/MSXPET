@@ -19,6 +19,7 @@ public enum Config {
 
     public static let sleepDelayMs: Int = 5000
     public static let happyDurationMs: Int = 3000
+    public static let swatDurationMs: Int = 700
     public static let speechDurationMs: Int = 3000
 
     public static let frameDurationMs: Int = 200

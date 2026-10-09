@@ -22,6 +22,9 @@ public struct PetEngine {
     public var happyTimeMs: Int = 0
     public var speechTimeMs: Int = 0
 
+    // Laser-catch flash (swat state): like happy but short, with its own art.
+    public var swatTimeMs: Int = 0
+
     public var chasing = false
     public var frozen = false
     public var dragging = false
@@ -252,10 +255,18 @@ public struct PetEngine {
             mood = max(0, mood - 2)
         }
         if catchCooldownMs > 0 { catchCooldownMs -= dtMs }
-        // happy expiry
+        // happy + swat expiry. Both are MODAL flashes: while one is showing,
+        // locomotion holds (fixes flashes being stomped one tick later by
+        // moveToward, which made laser catches invisible).
         if state == .happy {
             happyTimeMs += dtMs
             if happyTimeMs >= Config.happyDurationMs { setState(previousState) }
+            else { return }
+        }
+        if state == .swat {
+            swatTimeMs += dtMs
+            if swatTimeMs >= Config.swatDurationMs { setState(previousState) }
+            else { return }
         }
         guard !dragging else { return }
         if falling {
@@ -355,7 +366,7 @@ public struct PetEngine {
         clingDurationMs = Int.random(in: 1500...2500)
         fallVelocity.dx = 0
         fallVelocity.dy = 0
-        setState(.dragged)
+        setState(edge == .top ? .clingTop : .clingSide)
         speech = "!"
         speechTimeMs = 0
         soundCue = .pounce
@@ -379,7 +390,7 @@ public struct PetEngine {
             y = visibleRect.maxY - Config.petSize / 2
             x += j * 0.5 // dangling swing
         }
-        setState(.dragged)
+        setState(clingEdge == .top ? .clingTop : .clingSide)
         // Slid all the way down: that's a landing.
         if clingEdge != .top, y <= floorY {
             y = floorY
@@ -418,12 +429,12 @@ public struct PetEngine {
         soundCue = .pounce
     }
 
-    /// Laser catch! The pet bats the dot with its paws (happy frames),
+    /// Laser catch! The pet bats the dot with its paws (swat frames),
     /// hops toward it, then resumes the hunt when the flash expires.
     public mutating func playCatch(toward point: CGPoint) {
         previousState = state.isWalking ? state : .e
-        setState(.happy)
-        happyTimeMs = 0
+        setState(.swat)
+        swatTimeMs = 0
         let dx = point.x - x, dy = point.y - y
         let d = max(1, hypot(dx, dy))
         x += dx / d * 6

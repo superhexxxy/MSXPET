@@ -18,7 +18,7 @@ public final class PetManager {
     // Anchors ride alongside frames for overlay head-tracking.
     private struct PetAssets {
         var frames: [PetState: [NSImage]]
-        var anchors: [PetState: [CGPoint]]
+        var anchors: [PetState: [CGPoint]] // per-frame topmost (bobble deltas)
         var ref: CGPoint
     }
     private var assetCache: [String: PetAssets] = [:]
@@ -49,7 +49,10 @@ public final class PetManager {
         enabledOverlays = Set(UserDefaults.standard.stringArray(forKey: Config.accessoriesKey) ?? [])
         spawnPets(count: count)
         if laserOn {
-            for p in pets { p.engine.chasing = true }
+            for (i, p) in pets.enumerated() {
+                p.engine.chasing = true
+                p.laserPhase = CGFloat(i) / CGFloat(max(1, pets.count)) * 2 * .pi
+            }
         }
         pets.first?.engine.speech =
             "hi! i'm \(UserDefaults.standard.string(forKey: Config.nameKey) ?? petName)!"
@@ -64,13 +67,26 @@ public final class PetManager {
         if let cached = assetCache[name] { return cached }
         var frames: [PetState: [NSImage]] = [:]
         var anchors: [PetState: [CGPoint]] = [:]
+        var real: Set<PetState> = []
         for s in PetState.allCases {
             let loaded = AnimationLoader.loadFrames(petName: name, state: s)
-            let list = loaded.isEmpty
-                ? AnimationLoader.placeholderFrames(for: s, size: Config.petSize)
-                : loaded
-            frames[s] = list
-            anchors[s] = list.map { HeadAnchor.of($0) }
+            if loaded.isEmpty { continue } // resolved below: fallback, else placeholder
+            real.insert(s)
+            frames[s] = loaded
+            anchors[s] = loaded.map { HeadAnchor.of($0) }
+        }
+        // Same-pet fallbacks (swat→happy, clings→dragged) so new poses
+        // degrade to the closest real art instead of placeholders.
+        for s in PetState.allCases where !real.contains(s) {
+            if let fb = s.fallbackState, real.contains(fb) {
+                frames[s] = frames[fb]
+                anchors[s] = anchors[fb]
+                real.insert(s)
+            } else {
+                let ph = AnimationLoader.placeholderFrames(for: s, size: Config.petSize)
+                frames[s] = ph
+                anchors[s] = ph.map { HeadAnchor.of($0) }
+            }
         }
         let ref = anchors[.idle]?.first ?? CGPoint(x: 16, y: 4)
         let assets = PetAssets(frames: frames, anchors: anchors, ref: ref)
@@ -97,7 +113,12 @@ public final class PetManager {
         for p in pets { p.close() }
         pets = []
         spawnPets(count: n)
-        if laserOn { for p in pets { p.engine.chasing = true } }
+        if laserOn {
+            for (i, p) in pets.enumerated() {
+                p.engine.chasing = true
+                p.laserPhase = CGFloat(i) / CGFloat(max(1, pets.count)) * 2 * .pi
+            }
+        }
         poke()
     }
 
@@ -158,6 +179,11 @@ public final class PetManager {
         }
         if !on { laser.hide() }
         sound.play(on ? .laserOn : .laserOff)
+        if on {
+            for (i, p) in pets.enumerated() {
+                p.laserPhase = CGFloat(i) / CGFloat(max(1, pets.count)) * 2 * .pi
+            }
+        }
         poke()
     }
 
@@ -240,12 +266,18 @@ public final class PetManager {
         let visible = visibleFrame()
         if laserOn {
             laser.move(to: mouse)
-            let t = CGFloat(Date().timeIntervalSince1970)
+            let dtS = CGFloat(dtMs) / 1000.0
             for (i, p) in pets.enumerated() {
                 p.engine.chasing = true
                 p.engine.frozen = false
+                // Ring only rotates while far: near the dot the target
+                // steadies so the pet can close in and catch it.
+                let mdx = mouse.x - p.engine.x, mdy = mouse.y - p.engine.y
+                if mdx * mdx + mdy * mdy > 60 * 60 {
+                    p.laserPhase += dtS * 0.9
+                }
                 let off = LaserFormation.offset(index: i, count: pets.count,
-                                                timeSeconds: t)
+                                                timeSeconds: p.laserPhase)
                 let target = CGPoint(x: mouse.x + off.dx, y: mouse.y + off.dy)
                 p.engine.laserTarget = target
                 // Caught it! Bat the dot, celebrate, resume the hunt.
@@ -261,7 +293,8 @@ public final class PetManager {
         let overlays = activeOverlays()
         for p in pets {
             p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible)
-            p.applyOverlays(overlays)
+            // Hats come off for naps and wall stunts.
+            p.applyOverlays(p.engine.state == .sleeping || p.engine.clinging ? [] : overlays)
         }
         // Sleep purr: one shared loop while ANY pet dozes (idempotent).
         sound.setPurr(pets.contains { $0.engine.state == .sleeping })

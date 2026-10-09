@@ -38,6 +38,9 @@ public final class PetView: NSView {
         didSet { needsDisplay = true }
     }
 
+    /// Current animation state dir (e.g. "walk_east") for variant art.
+    public var overlayState: String = "idle"
+
     /// Head-tracking shift in 32px art units (y-down, like the canvas).
     /// Pet sets this per animation frame so hats ride the bobble.
     public var overlayShift = CGVector.zero {
@@ -55,7 +58,7 @@ public final class PetView: NSView {
         let r = NSRect(x: bounds.origin.x + overlayShift.dx * 2,
                        y: bounds.origin.y + overlayShift.dy * 2,
                        width: bounds.width, height: bounds.height)
-        for o in overlays { o.image.draw(in: r) }
+        for o in overlays { o.image(for: overlayState).draw(in: r) }
         drawZzz()
     }
 

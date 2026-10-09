@@ -289,7 +289,34 @@ final class PetEngineTests: XCTestCase {
         e.chasing = true
         XCTAssertTrue(e.catchReady)
         e.playCatch(toward: CGPoint(x: 510, y: 505))
-        XCTAssertEqual(e.state, .happy)
+        XCTAssertEqual(e.state, .swat)
         XCTAssertFalse(e.catchReady)
+    }
+
+    func testSwatHoldsThenResumes() {
+        // Modal flash: locomotion must NOT stomp it the next tick
+        // (the old happy-while-chasing bug that hid laser catches).
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.chasing = true
+        e.playCatch(toward: CGPoint(x: 600, y: 500))
+        let x0 = e.x
+        e.update(dtMs: 16, mouse: CGPoint(x: 900, y: 500),
+                 visibleRect: CGRect(x: 0, y: 0, width: 2000, height: 2000))
+        XCTAssertEqual(e.state, .swat)
+        XCTAssertEqual(e.x, x0, accuracy: 0.001)
+        for _ in 0..<60 {
+            e.update(dtMs: 16, mouse: CGPoint(x: 900, y: 500),
+                     visibleRect: CGRect(x: 0, y: 0, width: 2000, height: 2000))
+        }
+        XCTAssertNotEqual(e.state, .swat)
+        XCTAssertGreaterThan(e.x, x0)
+    }
+
+    func testFallbackStates() {
+        XCTAssertEqual(PetState.swat.fallbackState, .happy)
+        XCTAssertEqual(PetState.clingSide.fallbackState, .dragged)
+        XCTAssertEqual(PetState.clingTop.fallbackState, .dragged)
+        XCTAssertNil(PetState.idle.fallbackState)
     }
 }

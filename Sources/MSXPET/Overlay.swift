@@ -9,9 +9,23 @@ import Foundation
 public struct Overlay: Equatable {
     public var name: String
     public var image: NSImage
+    /// Directional variants, keyed by state directory name
+    /// (e.g. "walk_east"). Exact match first, then facing fallback
+    /// (diagonals borrow their cardinal: ne/se→east, nw/sw→west).
+    public var variants: [String: NSImage] = [:]
 
     public static func == (lhs: Overlay, rhs: Overlay) -> Bool {
         lhs.name == rhs.name
+    }
+
+    public func image(for stateDir: String) -> NSImage {
+        if let v = variants[stateDir] { return v }
+        let facing: [String: String] = [
+            "walk_northeast": "walk_east", "walk_southeast": "walk_east",
+            "walk_northwest": "walk_west", "walk_southwest": "walk_west",
+        ]
+        if let f = facing[stateDir], let v = variants[f] { return v }
+        return image
     }
 }
 
@@ -42,7 +56,17 @@ public enum OverlayLoader {
                   isDir.boolValue else { continue }
             let imgURL = folder.appendingPathComponent("overlay.png")
             guard let image = NSImage(contentsOf: imgURL) else { continue }
-            dict[name] = Overlay(name: name, image: image)
+            // Directional variants: <state>.png next to overlay.png.
+            var variants: [String: NSImage] = [:]
+            if let files = try? fm.contentsOfDirectory(atPath: folder.path) {
+                for file in files where file.hasSuffix(".png") && file != "overlay.png" {
+                    let key = String(file.dropLast(4)) // walk_east.png -> walk_east
+                    if let vimg = NSImage(contentsOf: folder.appendingPathComponent(file)) {
+                        variants[key] = vimg
+                    }
+                }
+            }
+            dict[name] = Overlay(name: name, image: image, variants: variants)
         }
     }
 
