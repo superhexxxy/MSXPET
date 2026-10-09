@@ -73,4 +73,9 @@ public enum Config {
     public static let greetPhrases: [String] = [
         "♥", "psps!", "heyy!!", "sisfur!!",
     ]
+    /// Idle grooming flavor.
+    public static let groomPhrases: [String] = [
+        "* washing face *", "* licking paw *", "* tail inspection *",
+        "* ear adjustment *", "cleaning. do not perceive.",
+    ]
 }

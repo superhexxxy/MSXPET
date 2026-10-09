@@ -13,6 +13,8 @@ public final class PetManager {
     private var currentInterval: TimeInterval = Config.tickInterval
     private var systemPaused = false
     private var playCheckAccumMs = 0
+    private var dialogue = DialogueRunner()
+    private var dialogueCooldownMs = 30_000
 
     // Shared asset cache so 3 nekos don't triple image memory.
     // Anchors ride alongside frames for overlay head-tracking.
@@ -293,8 +295,11 @@ public final class PetManager {
         let overlays = activeOverlays()
         for p in pets {
             p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible)
-            // Hats come off for naps and wall stunts.
             p.applyOverlays(p.engine.state == .sleeping || p.engine.clinging ? [] : overlays)
+        }
+        // Deliver due dialogue lines.
+        for (idx, line) in dialogue.update(dtMs: dtMs) {
+            if pets.indices.contains(idx) { pets[idx].engine.say(line) }
         }
         // Sleep purr + pat purr: one shared loop while ANY pet dozes
         // or luxuriates (idempotent).
@@ -324,22 +329,32 @@ public final class PetManager {
     }
 
     /// Pet-pet play: occasionally one kitten chases another's position,
-    /// or close ones stop to say hi.
+    /// close ones stop to say hi, and idle pairs start little dialogues.
     private func maybeSocialPlay(dtMs: Int) {
         guard pets.count >= 2 else { return }
         playCheckAccumMs += dtMs
         guard playCheckAccumMs >= 2000 else { return }
         playCheckAccumMs = 0
+        if dialogueCooldownMs > 0 { dialogueCooldownMs -= 2000 }
         // Greetings first: mutual happy flash when snouts nearly touch.
         for i in 0..<pets.count {
             for j in (i + 1)..<pets.count {
                 let dx = pets[i].engine.x - pets[j].engine.x
                 let dy = pets[i].engine.y - pets[j].engine.y
-                if dx * dx + dy * dy < 70 * 70,
-                   Double.random(in: 0...1) < 0.3 {
-                    pets[i].engine.greet()
-                    pets[j].engine.greet()
-                    return
+                if dx * dx + dy * dy < 70 * 70 {
+                    if Double.random(in: 0...1) < 0.3 {
+                        pets[i].engine.greet()
+                        pets[j].engine.greet()
+                        return
+                    }
+                    // …otherwise, if both are just hanging around, talk.
+                    if !dialogue.isRunning, dialogueCooldownMs <= 0,
+                       bothLoitering(pets[i], pets[j]),
+                       Double.random(in: 0...1) < 0.5 {
+                        dialogue.start(participants: [i, j])
+                        dialogueCooldownMs = Int.random(in: 45_000...75_000)
+                        return
+                    }
                 }
             }
         }
@@ -352,6 +367,16 @@ public final class PetManager {
         if ok {
             a.engine.inviteToChase(CGPoint(x: b.engine.x, y: b.engine.y), durationMs: 4000)
         }
+    }
+
+    /// A dialogue pair: both calm, wandering or idling, unbothered.
+    private func bothLoitering(_ a: Pet, _ b: Pet) -> Bool {
+        for p in [a, b] {
+            let e = p.engine
+            if e.dragging || e.falling || e.clinging || e.chasing || e.frozen { return false }
+            if e.state == .sleeping || e.state == .happy || e.state == .swat { return false }
+        }
+        return true
     }
 
     private func visibleFrame() -> CGRect {

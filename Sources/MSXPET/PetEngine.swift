@@ -89,6 +89,12 @@ public struct PetEngine {
     // Awake purr (pat reward) — manager loops the purr sound while true.
     public private(set) var purring = false
     private var purrUntilMs = 0
+    // Startle: fast cursor swoosh nearby → flinch + yelp (holds idle).
+    private var prevMouse = CGPoint.zero
+    private var prevMouseValid = false
+    private var startleCooldownMs = 0
+    // Grooming: idle spa breaks (happy flash + line, no click needed).
+    private var groomCooldownMs = 40_000
 
     // Remember pre-drag state (upstream was_chasing / was_frozen)
     private var wasChasing = false
@@ -280,6 +286,7 @@ public struct PetEngine {
     /// dtMs: elapsed ms since last tick. mouse: global mouse in AppKit coords.
     public mutating func update(dtMs: Int, mouse: CGPoint, visibleRect: CGRect) {
         clockMs += dtMs
+        trackStartle(dtMs: dtMs, mouse: mouse)
         // speech expiry
         if speech != nil {
             speechTimeMs += dtMs
@@ -348,6 +355,7 @@ public struct PetEngine {
             }
         } else {
             maybeAmbient()
+            maybeGroom(dtMs: dtMs)
             maybeBeg(mouse: mouse, visibleRect: visibleRect)
             maybePounce(dtMs: dtMs, mouse: mouse)
             wander(dtMs: dtMs, dtSeconds: CGFloat(dtMs) / 1000.0, visibleRect: visibleRect)
@@ -496,6 +504,48 @@ public struct PetEngine {
         }
     }
 
+    // MARK: - Awareness: startle, grooming
+
+    /// Fast cursor swoosh nearby → startled flinch + yelp. Holds idle
+    /// (no state change), so it never fights locomotion.
+    private mutating func trackStartle(dtMs: Int, mouse: CGPoint) {
+        defer {
+            prevMouse = mouse
+            prevMouseValid = true
+        }
+        if startleCooldownMs > 0 { startleCooldownMs -= dtMs }
+        guard prevMouseValid, !dragging, !chasing, !falling, !frozen,
+              state == .idle, socialTarget == nil else { return }
+        let dtS = max(CGFloat(dtMs) / 1000.0, 0.001)
+        let vx = (mouse.x - prevMouse.x) / dtS
+        let vy = (mouse.y - prevMouse.y) / dtS
+        guard hypot(vx, vy) > 2500 else { return }
+        let dx = mouse.x - x, dy = mouse.y - y
+        guard dx * dx + dy * dy < 120 * 120, startleCooldownMs <= 0 else { return }
+        let d = max(1, hypot(dx, dy))
+        x -= dx / d * 8
+        y -= dy / d * 8
+        targetX = x; targetY = y
+        speech = ["whoa!", "EEP."].randomElement()
+        speechTimeMs = 0
+        soundCue = .pounce
+        startleCooldownMs = 20_000
+    }
+
+    /// Idle spa break: brief happy grooming flash with a line.
+    /// Yields the mic: never overwrites another fresh line.
+    private mutating func maybeGroom(dtMs: Int) {
+        if groomCooldownMs > 0 { groomCooldownMs -= dtMs }
+        guard state == .idle, !begging, socialTarget == nil,
+              groomCooldownMs <= 0, speech == nil else { return }
+        groomCooldownMs = Int.random(in: 50_000...90_000)
+        previousState = state
+        setState(.happy)
+        happyTimeMs = 0
+        speech = Config.groomPhrases.randomElement()
+        speechTimeMs = 0
+    }
+
     // MARK: - Cursor pounce
 
     private mutating func maybePounce(dtMs: Int, mouse: CGPoint) {
@@ -528,9 +578,15 @@ public struct PetEngine {
         catchCooldownMs = Int.random(in: 3000...6000)
     }
 
+    /// Say an arbitrary line (dialogue system, greetings). Bubble +
+    /// auto-show handled downstream; no state change.
+    public mutating func say(_ line: String) {
+        speech = line
+        speechTimeMs = 0
+    }
+
     /// Pet-pet greeting: mutual happy flash with a cute line.
-    public mutating func greet() {
-        if state == .happy || state == .swat || dragging || falling
+    public mutating func greet() {        if state == .happy || state == .swat || dragging || falling
             || frozen || chasing || begging { return }
         previousState = state
         setState(.happy)

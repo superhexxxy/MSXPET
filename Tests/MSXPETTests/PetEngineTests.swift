@@ -401,3 +401,49 @@ final class PetEngineTests: XCTestCase {
         }
         XCTAssertTrue(seen, "frisky pets must zoom eventually")
     }
+
+    // MARK: - Social: dialogue, startle, grooming
+
+    func testDialogueRunner() {
+        var d = DialogueRunner()
+        XCTAssertFalse(d.start(participants: [7]))
+        XCTAssertTrue(d.start(participants: [0, 1]))
+        var got: [(Int, String)] = []
+        for _ in 0..<10 { got += d.update(dtMs: 1000) }
+        XCTAssertEqual(got.count, 3)
+        XCTAssertEqual(got[0].0, 0)
+        XCTAssertEqual(got[1].0, 1)
+        XCTAssertEqual(got[2].0, 0)
+        XCTAssertFalse(d.isRunning)
+    }
+
+    func testStartleFlinch() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.targetX = 500; e.targetY = 500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        for _ in 0..<300 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        XCTAssertEqual(e.state, .idle)
+        e.update(dtMs: 16, mouse: CGPoint(x: 520, y: 500), visibleRect: rect)
+        e.update(dtMs: 16, mouse: CGPoint(x: 700, y: 500), visibleRect: rect)
+        XCTAssertTrue(e.speech == "whoa!" || e.speech == "EEP.")
+        XCTAssertEqual(e.state, .idle, "flinch holds idle")
+    }
+
+    func testGroomingHappens() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.targetX = 500; e.targetY = 500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        var groomed = false
+        for _ in 0..<8000 {
+            e.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+            if let s = e.speech, Config.groomPhrases.contains(s) {
+                groomed = true; break
+            }
+        }
+        XCTAssertTrue(groomed, "long idles must include a spa break")
+    }
+}
+        XCTAssertTrue(seen, "frisky pets must zoom eventually")
+    }
