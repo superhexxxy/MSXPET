@@ -65,6 +65,11 @@ public struct PetEngine {
     private var catchCooldownMs = 0
     public var catchReady: Bool { catchCooldownMs <= 0 }
 
+    // Stall watchdog: legs running but going nowhere (blocked target,
+    // opposing forces, numerical limbo) → reroute instead of treadmill.
+    private var stallAccumMs = 0
+    private var stallAnchor = CGPoint(x: 0, y: 0)
+
     // Laser target override (manager sets mouse + formation offset per pet).
     // When chasing and set, the pet hunts this instead of the raw cursor.
     public var laserTarget: CGPoint? = nil
@@ -331,7 +336,7 @@ public struct PetEngine {
         }
         if chasing {
             let t = laserTarget ?? mouse
-            moveToward(tx: t.x, ty: t.y, dtSeconds: CGFloat(dtMs) / 1000.0)
+            moveToward(tx: t.x, ty: t.y, dtSeconds: CGFloat(dtMs) / 1000.0, visibleRect: visibleRect)
         } else if let st = socialTarget {
             // Play chase (cursor pounce or another pet): dart at the point
             // for a while, then resume wandering.
@@ -339,7 +344,7 @@ public struct PetEngine {
             if clockMs >= socialUntilMs || dx * dx + dy * dy < 4.0 {
                 socialTarget = nil
             } else {
-                moveToward(tx: st.x, ty: st.y, dtSeconds: CGFloat(dtMs) / 1000.0)
+                moveToward(tx: st.x, ty: st.y, dtSeconds: CGFloat(dtMs) / 1000.0, visibleRect: visibleRect)
             }
         } else {
             maybeAmbient()
@@ -582,13 +587,19 @@ public struct PetEngine {
             }
             return
         }
-        moveToward(tx: targetX, ty: targetY, dtSeconds: dtSeconds)
+        moveToward(tx: targetX, ty: targetY, dtSeconds: dtSeconds, visibleRect: visibleRect)
     }
 
-    private mutating func moveToward(tx: CGFloat, ty: CGFloat, dtSeconds: CGFloat) {
+    private mutating func moveToward(tx: CGFloat, ty: CGFloat, dtSeconds: CGFloat,
+                                    visibleRect: CGRect) {
         let dx = tx - x, dy = ty - y
         let dist = (dx * dx + dy * dy).squareRoot()
-        if dist * dist < 4.0 { setState(.idle); return }
+        if dist * dist < 4.0 {
+            setState(.idle)
+            stallAccumMs = 0
+            stallAnchor = CGPoint(x: x, y: y)
+            return
+        }
         // Position follows the TRUE normalized vector (smooth). Upstream
         // stepped along the snapped octant, which at 60Hz re-evaluation
         // dithers E-step/NE-step every tick near a boundary (positional
@@ -598,6 +609,24 @@ public struct PetEngine {
         else { x += dx / dist * maxStep; y += dy / dist * maxStep }
         // Displayed sprite uses the hysteresis-filtered octant.
         setState(filteredDirection(Self.findOctant(dx: dx, dy: dy)))
+        // Stall watchdog: walking visuals with no travel for 1.5s means
+        // something is wrong (blocked, opposed, or numerical) — reroute
+        // to a fresh destination instead of treadmilling forever.
+        stallAccumMs += Int(dtSeconds * 1000)
+        if stallAccumMs >= 1500 {
+            let traveled = hypot(x - stallAnchor.x, y - stallAnchor.y)
+            stallAccumMs = 0
+            stallAnchor = CGPoint(x: x, y: y)
+            if traveled < 6 {
+                pickRandomDestination(in: visibleRect, margin: Config.wanderMargin)
+                wanderWaitMs = 500
+                setState(.idle)
+                if Bool.random() {
+                    speech = "hmm."
+                    speechTimeMs = 0
+                }
+            }
+        }
     }
 
     /// Octant flicker filter: at 60Hz, float noise near a boundary flips the

@@ -249,11 +249,29 @@ final class PetEngineTests: XCTestCase {
     func testSeparationSplitsStacked() {
         let p = CGPoint(x: 100, y: 100)
         let (na, nb) = Separation.push(a: p, b: p)
-        XCTAssertGreaterThan(abs(na.dx - nb.dx), 30)
+        // Capped per-tick glide (no ±22pt teleport jitter), opposite sides.
+        XCTAssertGreaterThan(na.dx, 0)
+        XCTAssertLessThan(nb.dx, 0)
+        XCTAssertLessThanOrEqual(abs(na.dx), 6.01)
         let (fa, fb) = Separation.push(a: CGPoint(x: 0, y: 0),
                                         b: CGPoint(x: 1000, y: 1000))
         XCTAssertEqual(fa.dx, 0, accuracy: 0.001)
         XCTAssertEqual(fb.dx, 0, accuracy: 0.001)
+    }
+
+    func testStallWatchdogReroutes() {
+        // Pinned in place while walking -> must recover to idle + new target.
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.targetX = 1500; e.targetY = 500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        var recovered = false
+        for _ in 0..<600 {
+            e.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+            e.x = 500; e.y = 500 // external blockage
+            if e.state == .idle { recovered = true; break }
+        }
+        XCTAssertTrue(recovered, "watchdog must break the treadmill")
     }
 
     func testSoundCues() {

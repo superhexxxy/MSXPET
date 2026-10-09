@@ -18,16 +18,20 @@ public enum LaserFormation {
 public enum Separation {
     /// Push two pets apart when closer than minDist. Returns nudges
     /// (dx, dy) to ADD to (a, b) respectively. Pure — caller applies.
-    public static func push(a: CGPoint, b: CGPoint, minDist: CGFloat = 44)
-        -> (CGVector, CGVector) {
+    /// Per-tick push is capped: uncapped, a stacked pair teleports ±22pt
+    /// every 16ms tick (violent jitter); capped, they glide apart and the
+    /// stall watchdog covers any residual equilibrium.
+    public static func push(a: CGPoint, b: CGPoint, minDist: CGFloat = 44,
+                            perTickMax: CGFloat = 6) -> (CGVector, CGVector) {
         let dx = a.x - b.x, dy = a.y - b.y
         let dist = hypot(dx, dy)
         guard dist < minDist else { return (.zero, .zero) }
         if dist < 0.001 {
             // Exactly stacked: split along x deterministically.
-            return (CGVector(dx: minDist / 2, dy: 0), CGVector(dx: -minDist / 2, dy: 0))
+            let m = min(minDist / 2, perTickMax)
+            return (CGVector(dx: m, dy: 0), CGVector(dx: -m, dy: 0))
         }
-        let push = (minDist - dist) / 2
+        let push = min((minDist - dist) / 2, perTickMax)
         let nx = dx / dist * push, ny = dy / dist * push
         return (CGVector(dx: nx, dy: ny), CGVector(dx: -nx, dy: -ny))
     }
