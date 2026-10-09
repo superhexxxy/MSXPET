@@ -43,7 +43,9 @@ public enum Config {
         "warm hands.", "10/10 pats", "* kneads *", "keep goin",
         "certified cute", "i woke up cute", "whisker check: fab",
         "toe beans out", "did someone say snacks?", "i live here now",
-        "boop.",
+        "boop.", "mlem.", "* biscuit mode *", "u may continue.",
+        "purrmission granted.", "head empty, only pats.", "living art.",
+        "i'm the moment.", "feed me compliments.", "soft launch (me).",
     ]
     /// Unprompted attention-seeking lines (ambient timer, never on click).
     public static let ambientPhrases: [String] = [
@@ -54,6 +56,11 @@ public enum Config {
         "the red dot owes me money.", "i run this desktop.", "i saw that.",
         "u blinked first.", "tail says hi.", "professional loaf.",
         "i'm bored. entertain me.", "hey. heyheyheyheyhey.",
+        "sniff sniff… u smell like outside.", "i cleaned ONE paw today.",
+        "productivity.", "watching u work. judging. loving.",
+        "my tail has its own plans.", "brb, staring at wall.",
+        "i heard a wrapper. investigate?", "do fish dream? asking.",
+        "today's forecast: loaf, then zoom.", "i pay rent in cute.",
     ]
     /// Solicitation: wants pats.
     public static let begPhrases: [String] = [

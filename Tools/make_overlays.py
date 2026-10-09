@@ -135,7 +135,8 @@ def shades_variants():
         return img
     # measured face bands (both stride frames covered)
     specs = {
-        "walk_south.png": ((8, 10, 23, 15), (9, 11)),
+        "walk_south.png": ((8, 12, 23, 17), (9, 13)),
+        "walk_east_1.png": ((16, 10, 28, 15), (17, 11)),
         "walk_northeast.png": ((14, 7, 28, 12), (15, 8)),
         "walk_southeast.png": ((14, 9, 28, 14), (15, 10)),
         # leap frames throw the head far out: exact-frame variants
@@ -149,6 +150,8 @@ def shades_variants():
                 "walk_southwest.png" if "southeast" in name else None)
         if name.endswith("_1.png"):
             west = west.replace(".png", "_1.png") if west else None
+        if name == "walk_east_1.png":
+            west = "walk_west_1.png"
         if west:
             save_img(west, east.transpose(I.FLIP_LEFT_RIGHT))
 

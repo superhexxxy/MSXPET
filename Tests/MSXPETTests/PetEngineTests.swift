@@ -368,4 +368,18 @@ final class PetEngineTests: XCTestCase {
         XCTAssertEqual(a.state, .happy)
         XCTAssertTrue(Config.greetPhrases.contains(a.speech ?? ""))
     }
-}
+
+    func testZoomiesFireOnTrips() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.mood = 90
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        for _ in 0..<1400 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        var seen = false
+        for _ in 0..<20 {
+            e.pickRandomDestination(in: rect, margin: 100)
+            if e.speech == "ZOOMIES!!" { seen = true; break }
+            for _ in 0..<1300 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        }
+        XCTAssertTrue(seen, "frisky pets must zoom eventually")
+    }

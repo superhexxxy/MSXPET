@@ -76,6 +76,9 @@ public struct PetEngine {
     public var begging = false
     private var begUntilMs = 0
     private var begCooldownMs = 30_000
+    // Zoomies: random short speed burst when feeling good.
+    private var zoomieUntilMs = 0
+    private var zoomieCooldownMs = 20_000
     // Ambient attention-seeking chatter (unprompted bubbles).
     private var ambientCooldownMs = 20_000
     // Awake purr (pat reward) — manager loops the purr sound while true.
@@ -145,6 +148,13 @@ public struct PetEngine {
         targetX = random(minX...maxX)
         targetY = random(minY...maxY)
         wanderWaitMs = 0
+        // Zoomies: frisky pets sometimes just GO.
+        if mood >= 50, zoomieCooldownMs <= 0, Double.random(in: 0...1) < 0.45 {
+            zoomieUntilMs = clockMs + 1500
+            zoomieCooldownMs = Int.random(in: 20_000...40_000)
+            speech = "ZOOMIES!!"
+            speechTimeMs = 0
+        }
     }
 
     // MARK: - Interactions (mirror on_button_press/release, pet_* in xpet.c)
@@ -277,6 +287,7 @@ public struct PetEngine {
             mood = max(0, mood - 2)
         }
         if catchCooldownMs > 0 { catchCooldownMs -= dtMs }
+        if zoomieCooldownMs > 0 { zoomieCooldownMs -= dtMs }
         if begCooldownMs > 0 { begCooldownMs -= dtMs }
         if ambientCooldownMs > 0 { ambientCooldownMs -= dtMs }
         purring = clockMs < purrUntilMs
@@ -535,7 +546,8 @@ public struct PetEngine {
     /// pets (and late-night pets) slow down.
     private func speedMultiplier() -> CGFloat {
         let moodMult: CGFloat = mood >= 80 ? 1.35 : (mood <= 25 ? 0.8 : 1.0)
-        return moodMult * Self.energyMultiplier(hour: currentHour())
+        let zoom: CGFloat = clockMs < zoomieUntilMs ? 1.9 : 1.0
+        return min(2.0, moodMult * Self.energyMultiplier(hour: currentHour()) * zoom)
     }
 
     /// Night owls sleep: 23:00–06:00 sluggish, 07:00–10:00 zoomies.
