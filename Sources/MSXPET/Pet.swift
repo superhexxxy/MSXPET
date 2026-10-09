@@ -132,6 +132,9 @@ public final class Pet {
         view.zzz = zzz.parts
         updateAnimation(dtMs: dtMs)
         updateWindowPosition()
+        // The bubble rides along — never left behind mid-sentence.
+        bubble.follow(above: window.frame.origin,
+                      petSize: Config.petSize, visibleRect: visibleRect)
     }
 
     public func showBubbleIfNew() {

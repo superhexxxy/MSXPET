@@ -9,6 +9,8 @@ public final class SpeechBubble {
     private let label: NSTextField
     private var hideWork: DispatchWorkItem?
 
+    public private(set) var isShowing = false
+
     public init() {
         window = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 120, height: 28),
                          styleMask: [.borderless, .nonactivatingPanel],
@@ -46,13 +48,28 @@ public final class SpeechBubble {
         window.setFrame(NSRect(x: bx, y: by, width: w, height: h), display: true)
         label.frame = NSRect(x: 0, y: 0, width: w, height: h)
         window.orderFront(nil)
+        isShowing = true
         let work = DispatchWorkItem { [weak self] in self?.hide() }
         hideWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + Double(Config.speechDurationMs) / 1000.0, execute: work)
     }
 
+    /// Follow the pet while visible: re-anchor above its current origin.
+    /// Pet calls this every tick — cheap (one setFrameOrigin, no re-layout).
+    public func follow(above petOrigin: NSPoint, petSize: CGFloat, visibleRect: CGRect) {
+        guard isShowing else { return }
+        let w = window.frame.width, h = window.frame.height
+        var bx = petOrigin.x + petSize / 2 - w / 2
+        var by = petOrigin.y + petSize + 8
+        bx = min(max(bx, visibleRect.minX + 8), visibleRect.maxX - w - 8)
+        by = min(max(by, visibleRect.minY + 8), visibleRect.maxY - h - 8)
+        window.setFrameOrigin(NSPoint(x: bx, y: by))
+    }
+
     public func hide() {
         hideWork?.cancel()
+        hideWork = nil
+        isShowing = false
         window.orderOut(nil)
     }
 }
