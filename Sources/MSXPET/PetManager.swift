@@ -1,4 +1,4 @@
-// PetManager: owns engine + windows + 60Hz loop + frame animation.
+// PetManager: owns engine + windows + adaptive loop + frame animation.
 // Frame timing mirrors upstream FRAME_DURATION (200ms) with walk-phase
 // preservation handled implicitly by not resetting on walk->walk switches.
 
@@ -9,9 +9,15 @@ public final class PetManager {
     private let window: PetWindow
     private let view: PetView
     private let bubble = SpeechBubble()
+    private let laser = LaserDot()
     private var engine: PetEngine
     private var timer: Timer?
     private var lastTick = Date()
+    private var currentInterval: TimeInterval = Config.tickInterval
+    private var systemPaused = false
+    private var zzz = ZzzField()
+    private var lastBubbleText: String?
+    private var recentMoves: [(CGPoint, Date)] = []
 
     private var frames: [PetState: [NSImage]] = [:]
     private var frameIndex = 0
@@ -19,6 +25,16 @@ public final class PetManager {
     private var lastState: PetState = .idle
 
     public private(set) var petName: String
+    public private(set) var laserOn: Bool = false
+
+    /// Battery saver: fast loop only while something moves; slow otherwise.
+    /// Pure function of activity — unit-tested.
+    public static func tickInterval(walking: Bool, chasing: Bool, dragging: Bool,
+                                    falling: Bool, sleeping: Bool) -> TimeInterval {
+        if dragging || falling || chasing || walking { return 1.0 / 60.0 }
+        if sleeping { return 1.0 }
+        return 0.1
+    }
 
     public init(petName: String = Config.petName) {
         self.petName = petName
@@ -42,9 +58,20 @@ public final class PetManager {
         view.onDragEnd = { [weak self] in self?.handleDragEnd() }
         view.onClick = { [weak self] in self?.handleClick() }
 
+        laserOn = UserDefaults.standard.bool(forKey: Config.laserKey)
+        if laserOn { engine.chasing = true }
+        greet()
+
         updateWindowPosition()
         window.orderFrontRegardless()
+        subscribePowerNotifications()
         startLoop()
+    }
+
+    private func greet() {
+        let name = UserDefaults.standard.string(forKey: Config.nameKey) ?? petName
+        engine.speech = "hi! i'm \(name)!"
+        engine.speechTimeMs = 0
     }
 
     public func switchPet(_ name: String) {
@@ -52,6 +79,7 @@ public final class PetManager {
         UserDefaults.standard.set(name, forKey: Config.selectedPetKey)
         loadFrames()
         frameIndex = 0; frameAccumMs = 0
+        poke()
     }
 
     private func loadFrames() {
@@ -68,28 +96,105 @@ public final class PetManager {
     private func handleDragStart(screen: CGPoint) {
         if !engine.dragging { engine.beginDrag(mouseScreen: screen) }
         bubble.hide()
+        lastBubbleText = engine.speech
+        recentMoves = [(screen, Date())]
     }
 
     private func handleDragMove(screen: CGPoint) {
         if !engine.dragging { engine.beginDrag(mouseScreen: screen) }
         engine.dragTo(mouseScreen: screen)
+        recentMoves.append((screen, Date()))
+        let cutoff = Date().addingTimeInterval(-0.12)
+        recentMoves.removeAll { $0.1 < cutoff }
         updateWindowPosition() // sync now — zero frames of follow lag
     }
 
     private func handleDragEnd() {
-        engine.endDrag(in: visibleFrame())
+        engine.endDrag(in: visibleFrame(), releaseVelocity: releaseVelocity())
+        recentMoves = []
+        poke() // falling anim starts immediately, no slow-tick lag
+    }
+
+    /// Release velocity from recent drag motion (pt/s), for fling-to-fall.
+    private func releaseVelocity() -> CGVector {
+        guard let first = recentMoves.first, let last = recentMoves.last,
+              last.0 != first.0 else { return .zero }
+        let dt = last.1.timeIntervalSince(first.1)
+        guard dt > 0.01 else { return .zero }
+        let v = CGVector(dx: (last.0.x - first.0.x) / CGFloat(dt),
+                         dy: (last.0.y - first.0.y) / CGFloat(dt))
+        let speed = hypot(v.dx, v.dy)
+        guard speed > 1 else { return .zero }
+        let capped = min(speed, 1200) / speed
+        return CGVector(dx: v.dx * capped, dy: v.dy * capped)
     }
 
     private func handleClick() {
         engine.interact()
-        if let text = engine.speech {
-            bubble.show(text: text, above: window.frame.origin,
-                        petSize: Config.petSize, visibleRect: visibleFrame())
+        showBubbleIfNew()
+        poke()
+    }
+
+    private func showBubbleIfNew() {
+        if let s = engine.speech {
+            if s != lastBubbleText {
+                lastBubbleText = s
+                bubble.show(text: s, above: window.frame.origin,
+                            petSize: Config.petSize, visibleRect: visibleFrame())
+            }
+        } else {
+            lastBubbleText = nil
         }
     }
 
-    public func toggleChase() { engine.toggleChase(in: visibleFrame()) }
-    public func toggleFreeze() { engine.toggleFreeze() }
+    public func toggleChase() { engine.toggleChase(in: visibleFrame()); poke() }
+    public func toggleFreeze() { engine.toggleFreeze(); poke() }
+
+    public func setLaser(_ on: Bool) {
+        laserOn = on
+        UserDefaults.standard.set(on, forKey: Config.laserKey)
+        if on {
+            engine.frozen = false
+            engine.chasing = true
+            engine.speech = "ooh! shiny!"
+            engine.speechTimeMs = 0
+        } else {
+            laser.hide()
+            engine.chasing = false
+            engine.pickRandomDestination(in: visibleFrame(), margin: Config.wanderMargin)
+        }
+        poke()
+    }
+
+    // MARK: - Power: pause while locked/asleep (zero CPU while away)
+
+    private func subscribePowerNotifications() {
+        let ws = NSWorkspace.shared
+        ws.notificationCenter.addObserver(self, selector: #selector(sysPause),
+                                         name: NSWorkspace.willSleepNotification, object: nil)
+        ws.notificationCenter.addObserver(self, selector: #selector(sysResume),
+                                         name: NSWorkspace.didWakeNotification, object: nil)
+        let dist = DistributedNotificationCenter.default()
+        dist.addObserver(self, selector: #selector(sysPause),
+                         name: NSNotification.Name("com.apple.screenIsLocked"), object: nil)
+        dist.addObserver(self, selector: #selector(sysResume),
+                         name: NSNotification.Name("com.apple.screenIsUnlocked"), object: nil)
+    }
+
+    @objc private func sysPause() { applySystemPause(true) }
+    @objc private func sysResume() { applySystemPause(false) }
+
+    func applySystemPause(_ paused: Bool) {
+        if paused == systemPaused { return }
+        systemPaused = paused
+        if paused {
+            timer?.invalidate(); timer = nil
+        } else {
+            lastTick = Date()
+            startLoop()
+            tick()
+        }
+    }
 
     // MARK: - Loop
 
@@ -98,19 +203,48 @@ public final class PetManager {
         // Single registration in .common modes (fires during event tracking
         // too). NOTE: don't use scheduledTimer + add(.common) — that registers
         // the timer twice and risks double ticks.
-        let t = Timer(timeInterval: Config.tickInterval, repeats: true) { [weak self] _ in self?.tick() }
+        currentInterval = desiredInterval()
+        let t = Timer(timeInterval: currentInterval, repeats: true) { [weak self] _ in self?.tick() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
     }
 
+    private func desiredInterval() -> TimeInterval {
+        Self.tickInterval(walking: engine.state.isWalking,
+                          chasing: engine.chasing,
+                          dragging: engine.dragging,
+                          falling: engine.falling,
+                          sleeping: engine.state == .sleeping)
+    }
+
+    /// Run a tick right now (user actions shouldn't wait for a slow tick).
+    private func poke() {
+        if !systemPaused { tick() }
+    }
+
     private func tick() {
+        if systemPaused { return }
         let now = Date()
-        let dtMs = min(max(1, Int(now.timeIntervalSince(lastTick) * 1000)), 100)
+        let dtMs = min(max(1, Int(now.timeIntervalSince(lastTick) * 1000)), 2000)
         lastTick = now
         let mouse = NSEvent.mouseLocation
+        if laserOn {
+            laser.move(to: mouse)
+            engine.chasing = true
+            engine.frozen = false
+        }
         engine.update(dtMs: dtMs, mouse: mouse, visibleRect: visibleFrame())
+        showBubbleIfNew()
+        zzz.update(dtMs: dtMs, active: engine.state == .sleeping)
+        view.zzz = zzz.parts
         updateAnimation(dtMs: dtMs)
         updateWindowPosition()
+        // Settle the timer into the right gear.
+        let want = desiredInterval()
+        if abs(want - currentInterval) > 0.001, !systemPaused {
+            timer?.invalidate()
+            startLoop()
+        }
     }
 
     private func updateAnimation(dtMs: Int) {
@@ -127,13 +261,23 @@ public final class PetManager {
             frameIndex += 1
             if frameIndex >= list.count { frameIndex = 0 } // all upstream anims loop
         }
-        view.currentImage = list[frameIndex % list.count]
+        // Skip redundant assignment: the setter re-rasterizes the alpha mask
+        // and forces a redraw on every call, even for the identical image.
+        let next = list[frameIndex % list.count]
+        if view.currentImage !== next { view.currentImage = next }
     }
+
+    private var lastOrigin = NSPoint(x: -1, y: -1)
 
     private func updateWindowPosition() {
         let size = window.frame.size
-        window.setFrameOrigin(NSPoint(x: engine.x - size.width / 2,
-                                      y: engine.y - size.height / 2))
+        let origin = NSPoint(x: engine.x - size.width / 2,
+                             y: engine.y - size.height / 2)
+        // setFrameOrigin recomposites through the window server every call —
+        // skip it when the pet hasn't moved (the common idle case).
+        if origin == lastOrigin { return }
+        lastOrigin = origin
+        window.setFrameOrigin(origin)
     }
 
     private func visibleFrame() -> CGRect {

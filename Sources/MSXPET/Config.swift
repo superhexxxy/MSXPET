@@ -28,6 +28,8 @@ public enum Config {
     public static let petName = "neko"
     public static let availablePets = ["neko", "bsd", "dog"]
     public static let selectedPetKey = "MSXPET.pet"
+    public static let nameKey = "MSXPET.name"
+    public static let laserKey = "MSXPET.laser"
     public static let petPhrases: [String] = [
         "hewwo :3",
         "*purrs*",

@@ -10,6 +10,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var petItems: [String: NSMenuItem] = [:]
     private var loginItem: NSMenuItem?
+    private var laserItem: NSMenuItem?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         _ = notification
@@ -46,7 +47,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let freeze = NSMenuItem(title: "Toggle Freeze / Sleep", action: #selector(toggleFreeze), keyEquivalent: "s")
         freeze.target = self
         menu.addItem(freeze)
+        laserItem = NSMenuItem(title: "Laser Pointer", action: #selector(toggleLaser), keyEquivalent: "l")
+        laserItem?.target = self
+        menu.addItem(laserItem!)
         menu.addItem(.separator())
+
+        let rename = NSMenuItem(title: "Rename…", action: #selector(rename), keyEquivalent: "")
+        rename.target = self
+        menu.addItem(rename)
 
         loginItem = NSMenuItem(title: "Open at Login", action: #selector(toggleLogin), keyEquivalent: "")
         loginItem?.target = self
@@ -57,6 +65,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let quit = NSMenuItem(title: "Quit MSXPET", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
+        laserItem?.state = (manager?.laserOn ?? false) ? .on : .off
         statusItem?.menu = menu
     }
 
@@ -68,6 +77,29 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toggleChase() { manager?.toggleChase() }
     @objc private func toggleFreeze() { manager?.toggleFreeze() }
+    @objc private func toggleLaser() {
+        let on = !(manager?.laserOn ?? false)
+        manager?.setLaser(on)
+        laserItem?.state = on ? .on : .off
+    }
+    @objc private func rename() {
+        let alert = NSAlert()
+        alert.messageText = "Name your pet"
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 220, height: 24))
+        field.stringValue = UserDefaults.standard.string(forKey: Config.nameKey) ?? ""
+        field.placeholderString = "neko"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn {
+            let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+            if name.isEmpty {
+                UserDefaults.standard.removeObject(forKey: Config.nameKey)
+            } else {
+                UserDefaults.standard.set(name, forKey: Config.nameKey)
+            }
+        }
+    }
     @objc private func quit() { NSApplication.shared.terminate(nil) }
 
     // MARK: - Login item (macOS 13+, no entitlement needed for non-sandboxed app)

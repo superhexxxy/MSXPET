@@ -28,12 +28,55 @@ public final class PetView: NSView {
 
     override public var isFlipped: Bool { true }
 
+    /// Sleeping Zzz particles (view coords, y-down). Set by PetManager.
+    public var zzz: [ZParticle] = [] {
+        didSet { needsDisplay = true }
+    }
+
     override public func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         dirtyRect.fill()
         // Crisp pixel-art on Retina: no smoothing on upscale 32px -> 64pt.
         NSGraphicsContext.current?.imageInterpolation = .none
         currentImage?.draw(in: bounds)
+        drawHat()
+        drawZzz()
+    }
+
+    private func drawZzz() {
+        for z in zzz {
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.monospacedSystemFont(ofSize: z.size, weight: .bold),
+                .foregroundColor: NSColor.systemBlue.withAlphaComponent(z.alpha),
+            ]
+            ("z" as NSString).draw(at: NSPoint(x: z.x, y: z.y), withAttributes: attrs)
+        }
+    }
+
+    private func drawHat() {
+        let month = Calendar.current.component(.month, from: Date())
+        switch HatSeason.current(month: month) {
+        case .none:
+            return
+        case .santa:
+            // Pixel santa hat, top-center. Flipped coords: y grows downward.
+            NSColor.white.setFill() // brim
+            NSRect(x: 20, y: 8, width: 24, height: 5).fill()
+            NSColor.systemRed.setFill() // cone, stacked shrinking rects
+            NSRect(x: 23, y: 4, width: 18, height: 4).fill()
+            NSRect(x: 26, y: 0, width: 12, height: 4).fill()
+            NSColor.white.setFill() // pom
+            NSBezierPath(ovalIn: NSRect(x: 29, y: -3, width: 6, height: 6)).fill()
+        case .spooky:
+            // Pixel witch cone: dark brim, orange cone, brown tip.
+            NSColor.black.setFill()
+            NSRect(x: 18, y: 8, width: 28, height: 4).fill()
+            NSColor.systemOrange.setFill()
+            NSRect(x: 23, y: 4, width: 18, height: 4).fill()
+            NSRect(x: 27, y: 0, width: 10, height: 4).fill()
+            NSColor.brown.setFill()
+            NSRect(x: 30, y: -3, width: 4, height: 3).fill()
+        }
     }
 
     private func cacheAlpha(image: NSImage) {
