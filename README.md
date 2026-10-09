@@ -50,7 +50,7 @@ Critical porting fixes vs naive brainstorm (`chat.json`):
 - [x] CI (`.github/workflows/ci.yml`, macos-15, Swift 6.0)
 - [x] `PetEngine` unit tests (`Tests/MSXPETTests`)
 - [x] GPL-3.0 + attribution
-- [ ] Real PNG assets vendored (you)
+- [x] Real PNG assets vendored (120 frames: neko/bsd/dog × 12 states, via `Tools/convert_assets.py`)
 - [ ] App icon (`.icns`), `README` screenshot
 - [ ] Notarization + `dmg` release workflow
 - [ ] Settings UI (pet picker, speed), launch-at-login
