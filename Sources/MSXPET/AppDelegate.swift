@@ -9,6 +9,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var manager: PetManager?
     private var statusItem: NSStatusItem?
     private var petItems: [String: NSMenuItem] = [:]
+    private var countItems: [Int: NSMenuItem] = [:]
     private var loginItem: NSMenuItem?
     private var laserItem: NSMenuItem?
 
@@ -39,6 +40,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let petRoot = NSMenuItem(title: "Pet", action: nil, keyEquivalent: "")
         petRoot.submenu = petMenu
         menu.addItem(petRoot)
+
+        let countMenu = NSMenu()
+        for n in 1...3 {
+            let item = NSMenuItem(title: n == 1 ? "1 pet" : "\(n) pets",
+                                  action: #selector(selectCount(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = n
+            item.state = (n == (manager?.petCount ?? 1)) ? .on : .off
+            countMenu.addItem(item)
+            countItems[n] = item
+        }
+        let countRoot = NSMenuItem(title: "Clowder", action: nil, keyEquivalent: "")
+        countRoot.submenu = countMenu
+        menu.addItem(countRoot)
         menu.addItem(.separator())
 
         let chase = NSMenuItem(title: "Toggle Chase", action: #selector(toggleChase), keyEquivalent: "c")
@@ -73,6 +88,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let name = sender.representedObject as? String else { return }
         manager?.switchPet(name)
         for (n, item) in petItems { item.state = (n == name) ? .on : .off }
+    }
+
+    @objc private func selectCount(_ sender: NSMenuItem) {
+        guard let n = sender.representedObject as? Int else { return }
+        manager?.setCount(n)
+        for (k, item) in countItems { item.state = (k == n) ? .on : .off }
     }
 
     @objc private func toggleChase() { manager?.toggleChase() }

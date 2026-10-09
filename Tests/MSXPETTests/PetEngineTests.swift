@@ -79,6 +79,7 @@ final class PetEngineTests: XCTestCase {
         // 175x / 300 ticks at 60Hz, swapping sprites at full frame rate.
         // Displayed state must stay put; position still converges.
         var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
         e.targetX = 800; e.targetY = 640
         let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
         var flips = 0
@@ -96,6 +97,7 @@ final class PetEngineTests: XCTestCase {
     func testGenuineTurnStillAdopts() {
         // A real 90° turn must show within ~100ms (6 ticks @16ms).
         var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
         e.targetX = 900; e.targetY = 500
         let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
         for _ in 0..<10 {
@@ -107,5 +109,118 @@ final class PetEngineTests: XCTestCase {
             e.update(dtMs: 16, mouse: CGPoint(x: 0, y: 0), visibleRect: rect)
         }
         XCTAssertEqual(e.state, .n)
+    }
+
+    // MARK: - Life: chatter, mood, energy, pounce, falls, social
+
+    func testGrabChatterAndMood() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.beginDrag(mouseScreen: CGPoint(x: 500, y: 500))
+        XCTAssertNotNil(e.speech)
+        let before = e.mood
+        e.interact()
+        XCTAssertGreaterThan(e.mood, before)
+    }
+
+    func testEnergyMultipliers() {
+        XCTAssertEqual(PetEngine.energyMultiplier(hour: 3), 0.8, accuracy: 0.001)
+        XCTAssertEqual(PetEngine.energyMultiplier(hour: 8), 1.2, accuracy: 0.001)
+        XCTAssertEqual(PetEngine.energyMultiplier(hour: 14), 1.0, accuracy: 0.001)
+    }
+
+    func testHappyMoodZoomies() {
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        var fast = PetEngine(x: 500, y: 500)
+        fast.hourOverride = 12; fast.mood = 100
+        fast.targetX = 1500; fast.targetY = 500
+        var slow = PetEngine(x: 500, y: 500)
+        slow.hourOverride = 12; slow.mood = 70
+        slow.targetX = 1500; slow.targetY = 500
+        for _ in 0..<60 {
+            fast.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+            slow.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+        }
+        XCTAssertGreaterThan(fast.x - 500, (slow.x - 500) * 1.2)
+    }
+
+    func testPounceAtNearCursor() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.targetX = 500; e.targetY = 500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        for _ in 0..<500 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        XCTAssertEqual(e.state, .idle)
+        let x0 = e.x
+        for _ in 0..<20 {
+            e.update(dtMs: 16, mouse: CGPoint(x: 560, y: 500), visibleRect: rect)
+        }
+        XCTAssertGreaterThan(e.x, x0 + 5)
+        XCTAssertEqual(e.speech, "!")
+    }
+
+    func testFlingFallsAndLands() {
+        var e = PetEngine(x: 500, y: 800)
+        e.hourOverride = 12
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        e.beginDrag(mouseScreen: CGPoint(x: 500, y: 800))
+        e.endDrag(in: rect, releaseVelocity: CGVector(dx: 100, dy: -600))
+        XCTAssertTrue(e.falling)
+        var landed = false
+        for _ in 0..<600 {
+            e.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+            if !e.falling { landed = true; break }
+        }
+        XCTAssertTrue(landed)
+        XCTAssertEqual(e.speech, "whee!")
+        XCTAssertEqual(e.y, 32, accuracy: 1.0)
+    }
+
+    func testGentleReleaseDoesNotFall() {
+        var e = PetEngine(x: 500, y: 800)
+        e.hourOverride = 12
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        e.beginDrag(mouseScreen: CGPoint(x: 500, y: 800))
+        e.endDrag(in: rect, releaseVelocity: CGVector(dx: 10, dy: 10))
+        XCTAssertFalse(e.falling)
+        XCTAssertEqual(e.state, .idle)
+    }
+
+    func testSocialInviteMoves() {
+        var e = PetEngine(x: 100, y: 100)
+        e.hourOverride = 12
+        e.targetX = 100; e.targetY = 100
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        for _ in 0..<500 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        e.inviteToChase(CGPoint(x: 400, y: 100), durationMs: 5000)
+        let x0 = e.x
+        for _ in 0..<30 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        XCTAssertGreaterThan(e.x, x0 + 10)
+    }
+
+    func testTickIntervals() {
+        XCTAssertEqual(PetManager.tickInterval(walking: true, chasing: false,
+            dragging: false, falling: false, sleeping: false), 1.0 / 60.0, accuracy: 0.001)
+        XCTAssertEqual(PetManager.tickInterval(walking: false, chasing: false,
+            dragging: false, falling: false, sleeping: true), 1.0, accuracy: 0.001)
+        XCTAssertEqual(PetManager.tickInterval(walking: false, chasing: false,
+            dragging: false, falling: false, sleeping: false), 0.1, accuracy: 0.001)
+    }
+
+    func testZzzField() {
+        var z = ZzzField()
+        for _ in 0..<40 { z.update(dtMs: 100, active: false) }
+        XCTAssertTrue(z.parts.isEmpty)
+        for _ in 0..<7 { z.update(dtMs: 100, active: true) }
+        XCTAssertFalse(z.parts.isEmpty)
+        let y0 = z.parts[0].y
+        z.update(dtMs: 500, active: true)
+        XCTAssertLessThan(z.parts[0].y, y0)
+    }
+
+    func testHatSeasons() {
+        XCTAssertEqual(HatSeason.current(month: 12), .santa)
+        XCTAssertEqual(HatSeason.current(month: 10), .spooky)
+        XCTAssertEqual(HatSeason.current(month: 6), .none)
     }
 }
