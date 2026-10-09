@@ -187,14 +187,39 @@ public final class PetManager {
         let visible = visibleFrame()
         if laserOn {
             laser.move(to: mouse)
-            for p in pets { p.engine.chasing = true; p.engine.frozen = false }
+            let t = CGFloat(Date().timeIntervalSince1970)
+            for (i, p) in pets.enumerated() {
+                p.engine.chasing = true
+                p.engine.frozen = false
+                let off = LaserFormation.offset(index: i, count: pets.count,
+                                                timeSeconds: t)
+                p.engine.laserTarget = CGPoint(x: mouse.x + off.dx,
+                                               y: mouse.y + off.dy)
+            }
+        } else {
+            for p in pets { p.engine.laserTarget = nil }
         }
+        separatePets()
         for p in pets { p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible) }
         maybeSocialPlay(dtMs: dtMs)
         let want = desiredInterval()
         if abs(want - currentInterval) > 0.001, !systemPaused {
             timer?.invalidate()
             startLoop()
+        }
+    }
+
+    /// Soft separation so pets never sit on the same pixel (laser packs
+    /// especially). Applied pre-tick; engines re-aim next frame.
+    private func separatePets() {
+        for i in 0..<pets.count {
+            for j in (i + 1)..<pets.count {
+                let a = CGPoint(x: pets[i].engine.x, y: pets[i].engine.y)
+                let b = CGPoint(x: pets[j].engine.x, y: pets[j].engine.y)
+                let (na, nb) = Separation.push(a: a, b: b)
+                pets[i].engine.x += na.dx; pets[i].engine.y += na.dy
+                pets[j].engine.x += nb.dx; pets[j].engine.y += nb.dy
+            }
         }
     }
 

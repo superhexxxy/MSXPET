@@ -3,6 +3,11 @@
 import CoreGraphics
 import Foundation
 
+// MARK: - Sound cues (engine raises them; SoundManager plays them)
+
+public enum SoundEvent: String, CaseIterable {
+    case grab, happy, land, pounce, laserOn, laserOff, wake
+}
 // MARK: - Sleeping Zzz particles (PetView draws them; view coords: y-down)
 
 public struct ZParticle {

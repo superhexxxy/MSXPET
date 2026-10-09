@@ -46,6 +46,10 @@ public struct PetEngine {
     private var socialUntilMs = 0
     private var playCooldownMs = 6000
 
+    // Laser target override (manager sets mouse + formation offset per pet).
+    // When chasing and set, the pet hunts this instead of the raw cursor.
+    public var laserTarget: CGPoint? = nil
+
     // Monotonic engine clock (advanced by update).
     private var clockMs = 0
 
@@ -249,7 +253,8 @@ public struct PetEngine {
             return
         }
         if chasing {
-            moveToward(tx: mouse.x, ty: mouse.y, dtSeconds: CGFloat(dtMs) / 1000.0)
+            let t = laserTarget ?? mouse
+            moveToward(tx: t.x, ty: t.y, dtSeconds: CGFloat(dtMs) / 1000.0)
         } else if let st = socialTarget {
             // Play chase (cursor pounce or another pet): dart at the point
             // for a while, then resume wandering.
