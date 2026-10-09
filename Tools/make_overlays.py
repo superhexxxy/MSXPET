@@ -107,6 +107,52 @@ def shades():
     return px
 
 
+def shades_band(x0, y0, x1, y1, glint):
+    """Sunglasses band variant for a given face rect + glint point."""
+    px = blank()
+    B = (20, 20, 26, 255)
+    W = (255, 255, 255, 255)
+    rect(px, x0, y0, x1, y1, B)
+    gx, gy = glint
+    rect(px, gx, gy, gx + 1, gy + 1, W)
+    return px
+
+
+def save_img(name, img):
+    img.save(os.path.join(OUT, "shades", name))
+    print(f"shades/{name}")
+
+
+def shades_variants():
+    from PIL import Image as I
+    def put(px):
+        img = I.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+        pix = img.load()
+        for y in range(SIZE):
+            for x in range(SIZE):
+                if px[y][x]:
+                    pix[x, y] = px[y][x]
+        return img
+    # measured face bands (both stride frames covered)
+    specs = {
+        "walk_south.png": ((8, 10, 23, 15), (9, 11)),
+        "walk_northeast.png": ((14, 7, 28, 12), (15, 8)),
+        "walk_southeast.png": ((14, 9, 28, 14), (15, 10)),
+        # leap frames throw the head far out: exact-frame variants
+        "walk_northeast_1.png": ((19, 7, 29, 12), (20, 8)),
+        "walk_southeast_1.png": ((19, 10, 29, 15), (20, 11)),
+    }
+    for name, (band, glint) in specs.items():
+        east = put(shades_band(*band, glint))
+        save_img(name, east)
+        west = ("walk_northwest.png" if "northeast" in name else
+                "walk_southwest.png" if "southeast" in name else None)
+        if name.endswith("_1.png"):
+            west = west.replace(".png", "_1.png") if west else None
+        if west:
+            save_img(west, east.transpose(I.FLIP_LEFT_RIGHT))
+
+
 def template():
     px = blank()
     # anchor guides: top-center cross + canvas border (deleted by artist)
@@ -125,7 +171,8 @@ if __name__ == "__main__":
     if "--template" in sys.argv:
         save("template", template(), {"note": "delete guides, draw 32x32 RGBA"})
     else:
-        save("santa_hat", santa_hat(), {"months": [12]})
-        save("witch_hat", witch_hat(), {"months": [10]})
-        save("shades", shades(), {"species": ["neko"]})
+        save("santa_hat", santa_hat(), {})
+        save("witch_hat", witch_hat(), {})
+        save("shades", shades(), {})
+        shades_variants()
     print("done ->", os.path.abspath(OUT))

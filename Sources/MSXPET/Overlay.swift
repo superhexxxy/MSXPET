@@ -18,13 +18,19 @@ public struct Overlay: Equatable {
         lhs.name == rhs.name
     }
 
-    public func image(for stateDir: String) -> NSImage {
+    public func image(for stateDir: String, frame: Int = 0) -> NSImage {
+        // Most specific first: exact frame, then state, then facing
+        // (diagonals borrow their cardinal), then the default art.
+        if let v = variants["\(stateDir)_\(frame)"] { return v }
         if let v = variants[stateDir] { return v }
         let facing: [String: String] = [
             "walk_northeast": "walk_east", "walk_southeast": "walk_east",
             "walk_northwest": "walk_west", "walk_southwest": "walk_west",
         ]
-        if let f = facing[stateDir], let v = variants[f] { return v }
+        if let f = facing[stateDir] {
+            if let v = variants["\(f)_\(frame)"] { return v }
+            if let v = variants[f] { return v }
+        }
         return image
     }
 }

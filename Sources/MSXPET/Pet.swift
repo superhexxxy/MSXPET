@@ -162,6 +162,7 @@ public final class Pet {
         let next = list[frameIndex % list.count]
         if view.currentImage !== next { view.currentImage = next }
         view.overlayState = s.assetDirectoryName
+        view.overlayFrame = frameIndex % max(1, list.count)
         // Bobble delta only: translation of this frame vs the state's
         // first frame. (Absolute placement comes from variant art, not math.)
         if let alist = anchors[s], !alist.isEmpty {
