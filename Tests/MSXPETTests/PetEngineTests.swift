@@ -319,4 +319,53 @@ final class PetEngineTests: XCTestCase {
         XCTAssertEqual(PetState.clingTop.fallbackState, .dragged)
         XCTAssertNil(PetState.idle.fallbackState)
     }
+
+    // MARK: - Awareness: ambient chatter, solicitation, greetings
+
+    func testAmbientChatter() {
+        var e = PetEngine(x: 1500, y: 1500)
+        e.hourOverride = 12
+        e.targetX = 1500; e.targetY = 1500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        var heard: String? = nil
+        for _ in 0..<6000 {
+            e.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+            if let s = e.speech, Config.ambientPhrases.contains(s) {
+                heard = s; break
+            }
+        }
+        XCTAssertNotNil(heard, "must talk unprompted eventually")
+    }
+
+    func testBegPatPurr() {
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.targetX = 500; e.targetY = 500
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        let near = CGPoint(x: 600, y: 520)
+        for _ in 0..<2500 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        XCTAssertEqual(e.state, .idle)
+        var begged = false
+        for _ in 0..<3000 {
+            e.update(dtMs: 16, mouse: near, visibleRect: rect)
+            if e.begging { begged = true; break }
+        }
+        XCTAssertTrue(begged, "must come asking for pats")
+        let m0 = e.mood
+        e.interact()
+        XCTAssertGreaterThanOrEqual(e.mood, m0 + 15)
+        XCTAssertTrue(e.purring)
+        XCTAssertFalse(e.begging)
+    }
+
+    func testPetGreeting() {
+        var a = PetEngine(x: 100, y: 100)
+        a.hourOverride = 12
+        a.targetX = 100; a.targetY = 100
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        for _ in 0..<300 { a.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
+        a.greet()
+        XCTAssertEqual(a.state, .happy)
+        XCTAssertTrue(Config.greetPhrases.contains(a.speech ?? ""))
+    }
 }

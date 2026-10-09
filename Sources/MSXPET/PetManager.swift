@@ -296,8 +296,11 @@ public final class PetManager {
             // Hats come off for naps and wall stunts.
             p.applyOverlays(p.engine.state == .sleeping || p.engine.clinging ? [] : overlays)
         }
-        // Sleep purr: one shared loop while ANY pet dozes (idempotent).
-        sound.setPurr(pets.contains { $0.engine.state == .sleeping })
+        // Sleep purr + pat purr: one shared loop while ANY pet dozes
+        // or luxuriates (idempotent).
+        sound.setPurr(pets.contains {
+            $0.engine.state == .sleeping || $0.engine.purring
+        })
         maybeSocialPlay(dtMs: dtMs)
         let want = desiredInterval()
         if abs(want - currentInterval) > 0.001, !systemPaused {
@@ -320,12 +323,26 @@ public final class PetManager {
         }
     }
 
-    /// Pet-pet play: occasionally one kitten chases another's position.
+    /// Pet-pet play: occasionally one kitten chases another's position,
+    /// or close ones stop to say hi.
     private func maybeSocialPlay(dtMs: Int) {
         guard pets.count >= 2 else { return }
         playCheckAccumMs += dtMs
         guard playCheckAccumMs >= 2000 else { return }
         playCheckAccumMs = 0
+        // Greetings first: mutual happy flash when snouts nearly touch.
+        for i in 0..<pets.count {
+            for j in (i + 1)..<pets.count {
+                let dx = pets[i].engine.x - pets[j].engine.x
+                let dy = pets[i].engine.y - pets[j].engine.y
+                if dx * dx + dy * dy < 70 * 70,
+                   Double.random(in: 0...1) < 0.3 {
+                    pets[i].engine.greet()
+                    pets[j].engine.greet()
+                    return
+                }
+            }
+        }
         guard Double.random(in: 0...1) < 0.12 else { return }
         let a = pets.randomElement()!
         let others = pets.filter { $0 !== a }

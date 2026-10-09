@@ -72,6 +72,16 @@ public struct PetEngine {
     // Monotonic engine clock (advanced by update).
     private var clockMs = 0
 
+    // Solicitation: comes over asking for pats, waits, rewards pats.
+    public var begging = false
+    private var begUntilMs = 0
+    private var begCooldownMs = 30_000
+    // Ambient attention-seeking chatter (unprompted bubbles).
+    private var ambientCooldownMs = 20_000
+    // Awake purr (pat reward) — manager loops the purr sound while true.
+    public private(set) var purring = false
+    private var purrUntilMs = 0
+
     // Remember pre-drag state (upstream was_chasing / was_frozen)
     private var wasChasing = false
     private var wasFrozen = false
@@ -228,6 +238,18 @@ public struct PetEngine {
         previousState = state
         setState(.happy)
         happyTimeMs = 0
+        if begging {
+            // She came asking and you delivered: maximum reward.
+            begging = false
+            begCooldownMs = Int.random(in: 45_000...90_000)
+            mood = min(100, mood + 20)
+            purring = true
+            purrUntilMs = clockMs + 5000
+            speech = ["prrrp! ♥", "* LOUD purring *", "yessss. there."].randomElement()
+            speechTimeMs = 0
+            soundCue = .happy
+            return
+        }
         mood = min(100, mood + 12)
         if !Config.petPhrases.isEmpty {
             var phrase = Config.petPhrases.randomElement()!
@@ -255,6 +277,18 @@ public struct PetEngine {
             mood = max(0, mood - 2)
         }
         if catchCooldownMs > 0 { catchCooldownMs -= dtMs }
+        if begCooldownMs > 0 { begCooldownMs -= dtMs }
+        if ambientCooldownMs > 0 { ambientCooldownMs -= dtMs }
+        purring = clockMs < purrUntilMs
+        // Beg window expired while waiting for pats.
+        if begging, clockMs >= begUntilMs {
+            begging = false
+            begCooldownMs = Int.random(in: 45_000...90_000)
+            if Bool.random() {
+                speech = Config.ignoredPhrases.randomElement()
+                speechTimeMs = 0
+            }
+        }
         // happy + swat expiry. Both are MODAL flashes: while one is showing,
         // locomotion holds (fixes flashes being stomped one tick later by
         // moveToward, which made laser catches invisible).
@@ -297,9 +331,41 @@ public struct PetEngine {
                 moveToward(tx: st.x, ty: st.y, dtSeconds: CGFloat(dtMs) / 1000.0)
             }
         } else {
+            maybeAmbient()
+            maybeBeg(mouse: mouse, visibleRect: visibleRect)
             maybePounce(dtMs: dtMs, mouse: mouse)
             wander(dtMs: dtMs, dtSeconds: CGFloat(dtMs) / 1000.0, visibleRect: visibleRect)
         }
+    }
+
+    // MARK: - Attention seeking
+
+    /// Unprompted bubbles while loitering: she talks even when unclicked.
+    private mutating func maybeAmbient() {
+        guard state == .idle, !begging, ambientCooldownMs <= 0 else { return }
+        ambientCooldownMs = Int.random(in: 35_000...70_000)
+        speech = Config.ambientPhrases.randomElement()
+        speechTimeMs = 0
+    }
+
+    /// Comes over to the cursor asking for pats, sits, and waits.
+    /// Click (pat) while begging → sits + purrs (see interact).
+    private mutating func maybeBeg(mouse: CGPoint, visibleRect: CGRect) {
+        guard state == .idle, !begging, socialTarget == nil,
+              begCooldownMs <= 0 else { return }
+        // Only when the cursor is actually reachable on this screen.
+        let m = Config.wanderMargin
+        guard mouse.x > visibleRect.minX + m, mouse.x < visibleRect.maxX - m,
+              mouse.y > visibleRect.minY + m, mouse.y < visibleRect.maxY - m else { return }
+        // Don't cross the whole world; only when she's already fairly near.
+        let dx = mouse.x - x, dy = mouse.y - y
+        guard dx * dx + dy * dy < 450 * 450 else { return }
+        begging = true
+        begUntilMs = clockMs + 9000
+        socialTarget = mouse
+        socialUntilMs = begUntilMs
+        speech = Config.begPhrases.randomElement()
+        speechTimeMs = 0
     }
 
     // MARK: - Drop physics
@@ -418,7 +484,7 @@ public struct PetEngine {
 
     private mutating func maybePounce(dtMs: Int, mouse: CGPoint) {
         if playCooldownMs > 0 { playCooldownMs -= dtMs }
-        guard state == .idle, playCooldownMs <= 0 else { return }
+        guard state == .idle, playCooldownMs <= 0, socialTarget == nil else { return }
         let dx = mouse.x - x, dy = mouse.y - y
         guard dx * dx + dy * dy < 90 * 90 else { return }
         socialTarget = mouse
@@ -444,6 +510,17 @@ public struct PetEngine {
         if Bool.random() { speech = "gotcha!"; speechTimeMs = 0 }
         soundCue = .happy
         catchCooldownMs = Int.random(in: 3000...6000)
+    }
+
+    /// Pet-pet greeting: mutual happy flash with a cute line.
+    public mutating func greet() {
+        if state == .happy || state == .swat || dragging || falling
+            || frozen || chasing || begging { return }
+        previousState = state
+        setState(.happy)
+        happyTimeMs = 0
+        speech = Config.greetPhrases.randomElement()
+        speechTimeMs = 0
     }
 
     /// Another pet (or the manager) invites this one to chase a point.
