@@ -13,6 +13,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var loginItem: NSMenuItem?
     private var laserItem: NSMenuItem?
     private var soundItem: NSMenuItem?
+    private var accessoriesRoot: NSMenuItem?
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         _ = notification
@@ -55,6 +56,10 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         let countRoot = NSMenuItem(title: "Clowder", action: nil, keyEquivalent: "")
         countRoot.submenu = countMenu
         menu.addItem(countRoot)
+
+        accessoriesRoot = NSMenuItem(title: "Accessories", action: nil, keyEquivalent: "")
+        menu.addItem(accessoriesRoot!)
+        refreshAccessories()
         menu.addItem(.separator())
 
         let chase = NSMenuItem(title: "Toggle Chase", action: #selector(toggleChase), keyEquivalent: "c")
@@ -107,6 +112,43 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         manager?.setCount(n)
         for (k, item) in countItems { item.state = (k == n) ? .on : .off }
     }
+
+    private func refreshAccessories() {
+        let m = NSMenu()
+        for (name, enabled) in manager?.overlayList() ?? [] {
+            let pretty = name.replacingOccurrences(of: "_", with: " ").capitalized
+            let item = NSMenuItem(title: pretty, action: #selector(toggleAccessory(_:)),
+                                  keyEquivalent: "")
+            item.target = self
+            item.representedObject = name
+            item.state = enabled ? .on : .off
+            m.addItem(item)
+        }
+        m.addItem(.separator())
+        let reload = NSMenuItem(title: "Reload Assets", action: #selector(reloadAssets),
+                                keyEquivalent: "")
+        reload.target = self
+        m.addItem(reload)
+        let reveal = NSMenuItem(title: "Reveal Overlays Folder…",
+                                action: #selector(revealOverlays), keyEquivalent: "")
+        reveal.target = self
+        m.addItem(reveal)
+        accessoriesRoot?.submenu = m
+    }
+
+    @objc private func toggleAccessory(_ sender: NSMenuItem) {
+        guard let name = sender.representedObject as? String else { return }
+        let on = sender.state != .on
+        manager?.setOverlay(name, on: on)
+        sender.state = on ? .on : .off
+    }
+
+    @objc private func reloadAssets() {
+        manager?.reloadOverlays()
+        refreshAccessories()
+    }
+
+    @objc private func revealOverlays() { OverlayLoader.revealFolder() }
 
     @objc private func toggleChase() { manager?.toggleChase() }
     @objc private func toggleFreeze() { manager?.toggleFreeze() }

@@ -69,7 +69,8 @@ Critical porting fixes vs naive brainstorm (`chat.json`):
 
 - Drag pet to move · fling it and it falls with a *"whee!"* · Click = pets + phrases (happy pets get ♥)
 - It bats at your cursor when you linger nearby, sleeps with floating Zzz's, and lives on a day/night rhythm
-- Menu bar 🐾 → Pet (neko/bsd/dog) / Clowder (1–3 pets, they play together) / Chase / Freeze / Laser Pointer / Rename / Open at Login / Quit
+- Menu bar 🐾 → Pet (neko/bsd/dog) / Clowder (1–3 pets, they play together) / Chase / Freeze / Laser Pointer / Sound / Accessories / Rename / Open at Login / Quit
+- Dress-up + custom sounds: see **ASSETS.md** (drop-in PNG overlays, uploadable WAVs, no rebuild needed)
 
 ## Do I need full Xcode?
 

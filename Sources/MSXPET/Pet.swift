@@ -56,6 +56,11 @@ public final class Pet {
         frameIndex = 0; frameAccumMs = 0
     }
 
+    public func applyOverlays(_ overlays: [Overlay]) {
+        if view.overlays.map(\.name) == overlays.map(\.name) { return }
+        view.overlays = overlays
+    }
+
     /// True when this pet needs the fast 60Hz gear.
     public var needsFastTick: Bool {
         engine.dragging || engine.falling || engine.chasing

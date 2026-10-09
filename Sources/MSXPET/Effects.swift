@@ -29,8 +29,7 @@ public struct ZzzField {
 
     public init() {}
 
-    public mutating func update(dtMs: Int, active: Bool) {
-        if active {
+    public mutating func update(dtMs: Int, active: Bool) {        if active {
             spawnAccumMs += dtMs
             if spawnAccumMs >= 600 {
                 spawnAccumMs = 0
@@ -51,19 +50,5 @@ public struct ZzzField {
             parts[i].y -= CGFloat(dtMs) * 0.012 // float upward
         }
         parts.removeAll { $0.ageMs >= $0.lifeMs }
-    }
-}
-
-// MARK: - Seasonal hats (drawn procedurally in PetView — no art pipeline)
-
-public enum HatSeason {
-    case none, santa, spooky
-
-    public static func current(month: Int) -> HatSeason {
-        switch month {
-        case 12: return .santa
-        case 10: return .spooky
-        default: return .none
-        }
     }
 }

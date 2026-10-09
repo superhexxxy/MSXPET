@@ -218,9 +218,36 @@ final class PetEngineTests: XCTestCase {
         XCTAssertLessThan(z.parts[0].y, y0)
     }
 
-    func testHatSeasons() {
-        XCTAssertEqual(HatSeason.current(month: 12), .santa)
-        XCTAssertEqual(HatSeason.current(month: 10), .spooky)
-        XCTAssertEqual(HatSeason.current(month: 6), .none)
+    func testHatSeasonsRetired() {
+        // Procedural hats were deleted in favour of the overlay system;
+        // seasonal gating now lives in overlay meta (decoded as JSON).
+        let meta = #"{"months": [12]}"#.data(using: .utf8)!
+        let json = try! JSONSerialization.jsonObject(with: meta) as! [String: Any]
+        XCTAssertEqual(json["months"] as! [Int], [12])
+    }
+
+    func testLaserFormationDistinct() {
+        let o0 = LaserFormation.offset(index: 0, count: 3, timeSeconds: 1.0)
+        let o1 = LaserFormation.offset(index: 1, count: 3, timeSeconds: 1.0)
+        XCTAssertGreaterThan(hypot(o0.dx - o1.dx, o0.dy - o1.dy), 20)
+        XCTAssertEqual(LaserFormation.offset(index: 0, count: 1, timeSeconds: 5), .zero)
+    }
+
+    func testSeparationSplitsStacked() {
+        let p = CGPoint(x: 100, y: 100)
+        let (na, nb) = Separation.push(a: p, b: p)
+        XCTAssertGreaterThan(abs(na.dx - nb.dx), 30)
+        let (fa, fb) = Separation.push(a: CGPoint(x: 0, y: 0),
+                                        b: CGPoint(x: 1000, y: 1000))
+        XCTAssertEqual(fa.dx, 0, accuracy: 0.001)
+        XCTAssertEqual(fb.dx, 0, accuracy: 0.001)
+    }
+
+    func testSoundCues() {
+        let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
+        var e = PetEngine(x: 500, y: 500)
+        e.hourOverride = 12
+        e.beginDrag(mouseScreen: CGPoint(x: 500, y: 500))
+        XCTAssertEqual(e.soundCue, .grab)
     }
 }

@@ -32,6 +32,7 @@ public enum Config {
     public static let laserKey = "MSXPET.laser"
     public static let countKey = "MSXPET.count"
     public static let soundKey = "MSXPET.sound"
+    public static let accessoriesKey = "MSXPET.accessories"
     public static let petPhrases: [String] = [
         "hewwo :3",
         "*purrs*",

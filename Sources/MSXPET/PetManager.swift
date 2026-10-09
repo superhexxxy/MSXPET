@@ -17,6 +17,10 @@ public final class PetManager {
     // Shared frame cache so 3 nekos don't triple image memory.
     private var frameCache: [String: [PetState: [NSImage]]] = [:]
 
+    // Accessories (overlay layers). User-enabled set persisted.
+    private var allOverlays: [Overlay] = []
+    private var enabledOverlays: Set<String> = []
+
     public private(set) var petName: String
     public private(set) var laserOn: Bool = false
     public var petCount: Int { pets.count }
@@ -35,6 +39,8 @@ public final class PetManager {
         let count = max(1, min(3, UserDefaults.standard.integer(forKey: Config.countKey) == 0
             ? 1 : UserDefaults.standard.integer(forKey: Config.countKey)))
         laserOn = UserDefaults.standard.bool(forKey: Config.laserKey)
+        allOverlays = OverlayLoader.loadAll()
+        enabledOverlays = Set(UserDefaults.standard.stringArray(forKey: Config.accessoriesKey) ?? [])
         spawnPets(count: count)
         if laserOn {
             for p in pets { p.engine.chasing = true }
@@ -89,6 +95,29 @@ public final class PetManager {
         let f = frames(for: name)
         for p in pets { p.setFrames(f, petName: name) }
         poke()
+    }
+
+    // MARK: - Accessories
+
+    public func overlayList() -> [(name: String, enabled: Bool)] {
+        allOverlays.map { ($0.name, enabledOverlays.contains($0.name)) }
+    }
+
+    public func setOverlay(_ name: String, on: Bool) {
+        if on { enabledOverlays.insert(name) } else { enabledOverlays.remove(name) }
+        UserDefaults.standard.set(Array(enabledOverlays), forKey: Config.accessoriesKey)
+        poke()
+    }
+
+    public func reloadOverlays() {
+        allOverlays = OverlayLoader.loadAll()
+        poke()
+    }
+
+    private func activeOverlays(for petName: String, month: Int) -> [Overlay] {
+        allOverlays.filter {
+            enabledOverlays.contains($0.name) && $0.suits(petName: petName, month: month)
+        }
     }
 
     // MARK: - Shared actions (chaos applies to everyone)
@@ -214,7 +243,11 @@ public final class PetManager {
             for p in pets { p.engine.laserTarget = nil }
         }
         separatePets()
-        for p in pets { p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible) }
+        let month = Calendar.current.component(.month, from: Date())
+        for p in pets {
+            p.tick(dtMs: dtMs, mouse: mouse, visibleRect: visible)
+            p.applyOverlays(activeOverlays(for: p.petName, month: month))
+        }
         // Sleep purr: one shared loop while ANY pet dozes (idempotent).
         sound.setPurr(pets.contains { $0.engine.state == .sleeping })
         maybeSocialPlay(dtMs: dtMs)
