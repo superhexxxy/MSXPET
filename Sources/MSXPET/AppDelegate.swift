@@ -5,7 +5,6 @@
 import AppKit
 import ServiceManagement
 
-@main
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var manager: PetManager?
     private var statusItem: NSStatusItem?
