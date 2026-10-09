@@ -24,6 +24,8 @@ public final class PetView: NSView {
     override public func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         dirtyRect.fill()
+        // Crisp pixel-art on Retina: no smoothing on upscale 32px -> 64pt.
+        NSGraphicsContext.current?.imageInterpolation = .none
         currentImage?.draw(in: bounds)
     }
 

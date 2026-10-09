@@ -4,7 +4,16 @@ Native AppKit port of [uint23/xpet](https://github.com/uint23/xpet) (suckless X1
 
 GPL-3.0 (upstream derivative — see `LICENSE` + `ATTRIBUTION.md`).
 
-## Quickstart
+## Install (no paid Apple account — ad-hoc signed, not notarized)
+
+Download `MSXPET.zip` or `MSXPET.dmg` from GitHub Releases, then on first launch either right-click → Open, or:
+
+```zsh
+xattr -d com.apple.quarantine /Applications/MSXPET.app
+open /Applications/MSXPET.app
+```
+
+## Quickstart (from source)
 
 ```zsh
 cd /Users/shadow/Projects/MSXPET
@@ -56,6 +65,10 @@ Critical porting fixes vs naive brainstorm (`chat.json`):
 - [ ] Settings UI (pet picker, speed), launch-at-login
 - [ ] Optional global hotkeys (requires Accessibility entitlement + docs)
 
-## Controls (M0)
+## Controls
 
-- Drag pet to move · Click pet = happy + phrase · Menu bar 🐾 → Chase / Freeze / Quit
+- Drag pet to move · Click pet = happy + phrase · Menu bar 🐾 → Pet (neko/bsd/dog) / Chase / Freeze / Open at Login / Quit
+
+## Do I need full Xcode?
+
+No. Command Line Tools are enough to `swift build` and run `Scripts/build-app.sh` (that's how this was built). Full Xcode only adds: local `swift test`, Instruments, and — with a paid $99/yr account — Developer-ID signing + notarization. CI (free macos runners) already runs `swift test` + bundles the `.app`, and the Release workflow ships ad-hoc signed zips/dmgs without any paid account.

@@ -1,0 +1,32 @@
+name: Release
+# Tag push (v0.1.0) -> ad-hoc signed .app zip + dmg attached to GitHub Release.
+# No paid Apple Developer account: ad-hoc signature, NOT notarized.
+# Users on first launch: right-click Open, or: xattr -d com.apple.quarantine MSXPET.app
+on:
+  push:
+    tags:
+      - "v*"
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.0"
+      - name: Build .app
+        run: zsh Scripts/build-app.sh
+      - name: Package zip + dmg
+        run: |
+          (cd dist && zip -qr MSXPET.zip MSXPET.app)
+          hdiutil create -volname MSXPET -srcfolder dist/MSXPET.app -ov -format UDZO dist/MSXPET.dmg
+          ls -lh dist/
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/MSXPET.zip
+            dist/MSXPET.dmg
+          generate_release_notes: true

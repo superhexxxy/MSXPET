@@ -18,7 +18,10 @@ public final class PetManager {
     private var frameAccumMs = 0
     private var lastState: PetState = .idle
 
-    public init() {
+    public private(set) var petName: String
+
+    public init(petName: String = Config.petName) {
+        self.petName = petName
         let size = Config.petSize
         engine = PetEngine(x: 400, y: 300)
         window = PetWindow(contentRect: NSRect(x: 400, y: 300, width: size, height: size))
@@ -26,10 +29,7 @@ public final class PetManager {
         view.autoresizingMask = [.width, .height]
         window.contentView = view
 
-        for s in PetState.allCases {
-            let loaded = AnimationLoader.loadFrames(petName: Config.petName, state: s)
-            frames[s] = loaded.isEmpty ? AnimationLoader.placeholderFrames(for: s, size: size) : loaded
-        }
+        loadFrames()
 
         if let screen = NSScreen.main {
             let v = screen.visibleFrame
@@ -44,6 +44,22 @@ public final class PetManager {
         updateWindowPosition()
         window.orderFrontRegardless()
         startLoop()
+    }
+
+    public func switchPet(_ name: String) {
+        petName = name
+        UserDefaults.standard.set(name, forKey: Config.selectedPetKey)
+        loadFrames()
+        frameIndex = 0; frameAccumMs = 0
+    }
+
+    private func loadFrames() {
+        for s in PetState.allCases {
+            let loaded = AnimationLoader.loadFrames(petName: petName, state: s)
+            frames[s] = loaded.isEmpty
+                ? AnimationLoader.placeholderFrames(for: s, size: Config.petSize)
+                : loaded
+        }
     }
 
     // MARK: - Input

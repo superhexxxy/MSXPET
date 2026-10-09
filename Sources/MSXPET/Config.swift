@@ -26,7 +26,14 @@ public enum Config {
     public static let speechPadY: CGFloat = 6
 
     public static let petName = "neko"
+    public static let availablePets = ["neko", "bsd", "dog"]
+    public static let selectedPetKey = "MSXPET.pet"
     public static let petPhrases: [String] = [
-        "Lorem ipsum dolor sit amet...",
+        "hewwo :3",
+        "*purrs*",
+        "did someone say snacks?",
+        "i live here now",
+        "boop.",
+        "nap time? nap time.",
     ]
 }
