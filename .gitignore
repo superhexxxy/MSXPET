@@ -7,3 +7,7 @@ dist/
 xcuserdata/
 DerivedData/
 .swiftpm/
+
+# local brainstorming, never commit
+chat.json
+chat-export-*.json
