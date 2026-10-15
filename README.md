@@ -1,73 +1,81 @@
-# 🐾 MSXPET — your macOS desktop bestie
+# MSXPET
 
-**A native Apple Silicon desktop pet with actual personality.** She wanders your screen, naps with floating Zzz's, bats at your cursor, begs for pats (and purrs when you deliver), gossips with her sisters, and loses her mind over laser pointers. Zero Electron. Zero XQuartz. Just Swift + AppKit, running at ~1% CPU while she loafs.
+MSXPET is a native Apple Silicon desktop pet for macOS 13+ on ARM64. It brings the spirit of the classic X11 pet to macOS with a smoother, more opinionated, and more playful interface.
 
-> *pawsome. meowsome. oemgi.*
+She wanders your desktop, naps in place, reacts to your cursor, asks for pets, purrs when you indulge her, and can be run in small groups for extra chaos. The project is built around a lightweight custom game loop and a transparent, non-intrusive AppKit window.
 
-Inspired by [uint23/xpet](https://github.com/uint23/xpet) (suckless X11 pet), rebuilt from whiskers up for macOS 13+ on ARM64.
+Inspired by [uint23/xpet](https://github.com/uint23/xpet), rebuilt from the ground up for modern macOS.
 
-## ✨ Why she's the best
+## Why it stands out
 
-- **Alive** — wanders, chases, freezes, snoozes, dreams (day/night rhythm!), grooms, gets the zoomies, startles at swooshy cursors
-- **Needy (affectionate)** — comes asking for pats (*"pet tax due."*), sits + purrs when you pay up, talks even when unclicked, gets moody when ignored (check the 🐾 → Mood menu, it goes *blissful → grumpy*)
-- **Social** — run a clowder of 1–3; they chase each other, stop to say hi (*"sisfur!!"*), and hold full multi-line dialogues (*"i saw the laser first." / "did not." / "did too."*)
-- **Playable physics** — drag her, fling her (gravity + bounces + *"whee!"*), watch her grab walls mid-flight, scramble, and occasionally stick the landing with a *"phew."*
-- **Dress-up** — santa hats, witch hats, sunglasses (with per-direction fits!), all pixel-perfect and head-tracked through the walk cycle. Make your own in 5 minutes — see **ASSETS.md**
-- **Sounds you can hear** — synthesized cute bleeps, chirps, thumps + a seamless sleep-purr loop. Upload your own WAVs, no rebuild needed
-- **Polite houseguest** — no Dock icon, click-through transparency, pauses on screen lock, adaptive tick (60Hz playing → 1Hz asleep)
+- Alive behavior: roaming, chasing, freezing, snoozing, dreaming, grooming, zoomies, and cursor-triggered startles
+- Affection system: asks for pats, sits and purrs when you comply, and changes mood when ignored
+- Social interactions: run one to three pets together, let them greet each other, and watch them talk in multi-line dialogs
+- Playful physics: drag, fling, and toss her around with gravity, wall clinging, and bounces
+- Customization: hats, sunglasses, accessories, sound packs, and custom asset support
+- Audio support: bundled synthesized sounds and support for custom WAV input without rebuilding the app
+- Respectful desktop behavior: transparent click-through windows, no Dock icon, and pauses on screen lock
 
-## 🚀 Get her running
+## Running the app
 
-**Easiest** — grab `MSXPET.zip` from [Releases](https://github.com/superhexxxy/MSXPET/releases), then on first launch right-click → Open (ad-hoc signed, no paid Apple account involved), or:
+### Download a release
+
+Grab `MSXPET.zip` from the [Releases](https://github.com/superhexxxy/MSXPET/releases) page. On first launch, right-click the app and choose Open to bypass the macOS quarantine gate for an ad hoc signed build.
+
+If needed, you can also remove the quarantine flag manually:
 
 ```zsh
 xattr -d com.apple.quarantine /Applications/MSXPET.app
 open /Applications/MSXPET.app
 ```
 
-**From source** (Command Line Tools are enough — no Xcode required):
+### Build from source
+
+Command Line Tools are sufficient; Xcode is not required for a local build.
 
 ```zsh
-swift run                # dev run
-zsh Scripts/build-app.sh # -> dist/MSXPET.app (signed, bundled)
+swift run                # run in development mode
+zsh Scripts/build-app.sh # creates dist/MSXPET.app
 open dist/MSXPET.app
 ```
 
-## 🎮 Controls
+## Controls
 
-| Do this | She does this |
+| Action | Result |
 |---|---|
-| Drag her | Gets carried (*"hey!"*), tracks your cursor 1:1 |
-| Fling her | Gravity takes over — bounces, wall-clings, *"whee!"* |
-| Click / hover her | Pets + wiggles, phrases, ♥ at high mood |
-| Park cursor nearby | She wanders over asking for pats |
-| 🐾 → Pet / Clowder | neko, bsd, dog — solo or a pack of 3 |
-| 🐾 → Chase / Laser (`L`) | Hunt mode (she *catches* the dot now, with paw-bats + *"gotcha!"*) |
-| 🐾 → Give snack (`F`) | *"nom!!"*, +20 mood, wakes sleepers (*"FOOD?!"*) |
-| 🐾 → Sound / Accessories / Rename / Mood | Exactly what they say |
-| 🐾 → Open at Login | She'll be waiting after every reboot |
+| Drag her | She follows your cursor and reacts to being carried |
+| Fling her | Gravity takes over, causing bounces, wall-clings, and playful motion |
+| Click or hover | Triggers petting, wiggles, mood changes, and dialogue |
+| Move the cursor nearby | She comes over to ask for attention |
+| Pet / Clowder | Choose between different pet types and run a clowder of up to three |
+| Chase / Laser (L) | Activates hunt mode, with paw-bats and reaction to the laser dot |
+| Give snack (F) | Adds mood, wakes sleepy pets, and triggers a happy reaction |
+| Sound / Accessories / Rename / Mood | Adjusts behavior and appearance directly from the menu |
+| Open at Login | Starts MSXPET automatically after a reboot |
 
-## 🧠 Elite engineering bits (for the nerds)
+## Engineering notes
 
-| Upstream X11 | MSXPET AppKit |
+MSXPET keeps the original xpet loop and logic, but ports it into a modern macOS architecture.
+
+| Original concept | Current implementation |
 |---|---|
-| `override_redirect` window | Borderless nonactivating `NSPanel`, `.floating`, all-spaces (`PetWindow.swift`) |
-| `XShapeCombineMask` | Per-pixel alpha `hitTest` → true click-through (`PetView.swift`) |
-| `xpet.c` game loop | `PetEngine`: pure, deterministic, headless-testable struct — ms accumulators, hysteresis-filtered octants, stall watchdog, drop/cling physics (`PetEngine.swift`) |
-| Fixed 200ms tick | Adaptive 60Hz → 10Hz → 1Hz by activity + redundant-composite skipping |
-| 120 XPM frames | 120 PNGs + 6 hand-authored poses (`swat`, `cling_side`, `cling_top`) + directional accessory variants |
+| `override_redirect` window | Borderless, non-activating `NSPanel` with floating behavior and all-spaces support |
+| X11 window masking | Per-pixel alpha hit testing for click-through behavior |
+| xpet game loop | Deterministic `PetEngine` with timers, state transitions, and physics updates |
+| Fixed tick speed | Adaptive frame pacing from active motion to low-power idle behavior |
+| Sprite animation | PNG assets plus directional accessory variants and pose variations |
 
-Porting gotchas solved along the way: Y-axis flip, octant `2x` thresholds, walk-phase preservation, top-down pixel buffers (caught by byte-level PIL cross-checks), timer double-registration. ~45 XCTest cases; `swift test` runs on CI (macos-15, Swift 6.0).
+The codebase includes workarounds for typical porting issues such as axis flips, threshold tuning, preserved walk phases, pixel-buffer handling, and timer registration edge cases.
 
-## 🔮 Roadmap
+## Roadmap
 
-- [ ] **Scriptable nekos** — behavior packs (JSON) → JavaScriptCore hooks → Shortcuts intents. *Your* pet, *your* rules
-- [ ] **A tiny soul** — opt-in 1B-class on-device brain (MLX) for fresh lines + memory + dreams, with scripted fallback. 100% local, obviously
+- [ ] Scriptable pets with JSON behavior packs and JavaScriptCore hooks
+- [ ] Lightweight local ML model for personality, memory, and dream states
 - [ ] `v0.1.0`
 
-## 📜 License
+## License
 
-Our code: **WTFPL** — do what the fuck you want to (see `LICENSE`).
-Upstream art + ported logic: **GPL-3.0** — uint23's sprites ship with this app
-(see `LICENSES/GPL-3.0.txt` + `ATTRIBUTION.md`), so the bundled app as a
-whole stays GPL-bound. Sorry, lawyers — the cats made us do it. 🐾
+- Source code: WTFPL (`LICENSE`)
+- Upstream art and ported logic: GPL-3.0 (`LICENSES/GPL-3.0.txt` and `ATTRIBUTION.md`)
+
+The bundled application remains GPL-licensed as a whole because it includes the upstream art and logic in this distribution.
