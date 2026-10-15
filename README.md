@@ -2,7 +2,7 @@
 
 [![Release](https://img.shields.io/github/v/release/superhexxxy/MSXPET?label=release&style=flat-square)](https://github.com/superhexxxy/MSXPET/releases) [![License](https://img.shields.io/badge/license-WTFPL%20%2B%20GPL--3.0-blue?style=flat-square)](LICENSE) [![Stars](https://img.shields.io/github/stars/superhexxxy/MSXPET?style=social&label=stars)](https://github.com/superhexxxy/MSXPET/stargazers) [![Issues](https://img.shields.io/github/issues/superhexxxy/MSXPET?style=flat-square)](https://github.com/superhexxxy/MSXPET/issues) [![Downloads](https://img.shields.io/github/downloads/superhexxxy/MSXPET/total?style=flat-square)](https://github.com/superhexxxy/MSXPET/releases)
 
-[![macOS](https://img.shields.io/badge/platform-macOS%20%7C%2013%2B-black?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/) [![Apple Silicon](https://img.shields.io/badge/arch-Apple%20Silicon-000000?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/apple-silicon/) [![Swift](https://img.shields.io/badge/Swift-5.9-F05138?style=flat-square&logo=swift&logoColor=white)](https://swift.org)
+[![macOS](https://img.shields.io/badge/platform-macOS%20%7C%2013%2B-black?style=flat-square&logo=apple&logoColor=white)](https://www.apple.com/macos/) [![Apple Silicon](https://img.shields.io/badge/arch-Apple%20Silicon-000000?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com/apple-silicon/) [![Swift](https://img.shields.io/badge/Swift-6.0-F05138?style=flat-square&logo=swift&logoColor=white)](https://swift.org)
 
 MSXPET is a native macOS desktop pet for Apple Silicon (ARM64) — lightweight, responsive, and designed to be an unobtrusive little companion on your screen. Run a single pet or a clowder of up to three; they roam, nap, purr, and interact with each other and your cursor.
 
@@ -14,14 +14,14 @@ Inspired by [uint23/xpet](https://github.com/uint23/xpet), MSXPET reimagines the
 - Affection system: pets respond to attention, purr, and change mood when neglected
 - Social behaviors for groups of pets: greetings, chasing, and short dialog exchanges
 - Physics-driven movement: drag, fling, wall cling, bounce, and recover
-- Customizable appearance and sound: accessories, hat variants, and user-supplied PNG/WAV assets
+- Customizable appearance and sound: accessories (with directional variants) and user-supplied PNG/WAV assets
 - Desktop-friendly by design: per-pixel click-through, no Dock icon, and pauses on screen lock
 
 ## Showcase
 
 Add a GIF or screenshot to this section to highlight MSXPET in action. Example placeholder:
 
-![demo-placeholder](https://raw.githubusercontent.com/superhexxxy/MSXPET/main/Resources/demo.gif)
+*Demo GIF landing with v0.1.0 — she photographs poorly when startled.*
 
 ## Install
 
@@ -64,7 +64,7 @@ open dist/MSXPET.app
 
 - Sprite assets: Sources/MSXPET/Resources/pets/<pet>/<state>/<n>.png
 - Convert upstream xpet assets using the included script (Pillow required): see ASSETS.md
-- Sounds: drop WAV files into the assets folder; MSXPET can load them at runtime without rebuilding
+- Sounds: drop `<event>.wav` files into `~/Library/Application Support/MSXPET/Sounds/` (see ASSETS.md); no rebuild needed
 
 ## Engineering notes
 
@@ -93,7 +93,7 @@ Contributions are welcome. If you plan to add features, assets, or fixes:
 1. Open an issue describing the change.
 2. Create a branch and submit a pull request with tests or screenshots when appropriate.
 
-See CONTRIBUTING.md for more details (if present).
+See CONTRIBUTING.md for the full guide.
 
 ## License & attribution
 
