@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="MSXPET — a super pawsome native macOS desktop pet for Apple Silicon.">
+<title>MSXPET — super pawsome desktop pet</title>
+<style>
+  :root { --ink: #111; --grey: #666; --line: #ddd; --paper: #fff; --wash: #f5f5f5; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink);
+         font: 14px/1.7 ui-monospace, Menlo, Consolas, monospace;
+         -webkit-font-smoothing: antialiased; }
+  main { max-width: 560px; margin: 0 auto; padding: 48px 20px 64px; }
+  header { text-align: center; margin-bottom: 8px; }
+  #cat { width: 128px; height: 128px; image-rendering: pixelated; }
+  h1 { font-size: 28px; letter-spacing: 6px; margin: 12px 0 4px; }
+  .tag { color: var(--grey); }
+  .tag .cur { display: inline-block; width: 9px; height: 16px;
+              background: var(--ink); vertical-align: -2px;
+              animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  hr { border: 0; border-top: 1px dashed var(--line); margin: 24px 0; }
+  h2 { font-size: 12px; letter-spacing: 3px; color: var(--grey);
+       margin-bottom: 10px; }
+  h2::before { content: "// "; }
+  ul { list-style: none; }
+  li { padding-left: 18px; position: relative; margin-bottom: 4px; }
+  li::before { content: "▸"; position: absolute; left: 0; color: var(--grey); }
+  pre { background: var(--wash); border: 1px solid var(--ink);
+        padding: 12px 14px; font-size: 12px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  td { padding: 5px 0; border-bottom: 1px dotted var(--line); vertical-align: top; }
+  td:first-child { white-space: nowrap; padding-right: 16px; }
+  nav { text-align: center; }
+  nav a { color: var(--ink); text-decoration: none; border-bottom: 2px solid var(--ink);
+          margin: 0 10px; font-size: 13px; letter-spacing: 1px; }
+  nav a:hover { background: var(--ink); color: var(--paper); }
+  footer { text-align: center; color: var(--grey); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img id="cat" alt="neko pet" width="128" height="128"
+      src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABDklEQVR4nO2W6w6DMAiFC/H9X5lF0zqKXFqs8Y8n2Zb0wvkGxVrKp5cFiT10c38agI4v+vsDwG0QyBhfgtwAgcjcMzZApiCwLFSFpVUANPPvJyCIz+NK8wFd4uIT5koWyIqLljk72aYG1pzGIi5oACQJI4N9vbZmH2umUTZRM8+0kwQbFcqBWXMrCwFc1wVk1Gd5JzRQDoFi8jFzS6iY16GxtLYDJ8faZwQAjJoPQ2hAvKwi9VyUvozEDZgq2QEXAVQKabrEfP/Zpnf25QozpM3zMweOUdeeWhac4BxWIzwXbQ6AFjA0Zg+mttEtMzhzzaV7NlidYV02y19KvXOQuUNgZrGSFT6WiffpU3ldP/4zrhJYayvWAAAAAElFTkSuQmCC">
+    <h1>MSXPET</h1>
+    <p class="tag">super pawsome desktop pet. meowsome. oemgi. <span class="cur"></span></p>
+  </header>
+  <hr>
+  <h2>RUN</h2>
+  <pre>zsh Scripts/build-app.sh
+open dist/MSXPET.app</pre>
+  <hr>
+  <h2>SPECS</h2>
+  <ul>
+    <li>native Swift + AppKit, Apple Silicon</li>
+    <li>wanders, naps, begs for pats, purrs</li>
+    <li>clowder mode: up to 3, they gossip</li>
+    <li>laser pointer certified</li>
+    <li>dress-up: hats, shades. bring your own PNG</li>
+    <li>~1% CPU. polite houseguest.</li>
+  </ul>
+  <hr>
+  <h2>CONTROLS</h2>
+  <table>
+    <tr><td>drag / fling</td><td>carry · gravity + wall-cling</td></tr>
+    <tr><td>click / hover</td><td>pats + wiggles + phrases</td></tr>
+    <tr><td>menu: F / L / C</td><td>snack / laser / chase</td></tr>
+    <tr><td>menu: pets</td><td>neko · bsd · dog, accessories, mood</td></tr>
+  </table>
+  <hr>
+  <nav>
+    <a href="https://github.com/superhexxxy/MSXPET">GITHUB</a><a href="https://github.com/superhexxxy/MSXPET/releases">RELEASES</a><a href="https://github.com/superhexxxy/MSXPET/blob/main/ASSETS.md">ASSETS</a>
+  </nav>
+  <hr>
+  <footer>WTFPL code · GPL-3.0 art · made of pixels &amp; love</footer>
+</main>
+<script>
+  // authentic 5fps waddle, straight from the sprite sheet
+  var f = [
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABDklEQVR4nO2W6w6DMAiFC/H9X5lF0zqKXFqs8Y8n2Zb0wvkGxVrKp5cFiT10c38agI4v+vsDwG0QyBhfgtwAgcjcMzZApiCwLFSFpVUANPPvJyCIz+NK8wFd4uIT5koWyIqLljk72aYG1pzGIi5oACQJI4N9vbZmH2umUTZRM8+0kwQbFcqBWXMrCwFc1wVk1Gd5JzRQDoFi8jFzS6iY16GxtLYDJ8faZwQAjJoPQ2hAvKwi9VyUvozEDZgq2QEXAVQKabrEfP/Zpnf25QozpM3zMweOUdeeWhac4BxWIzwXbQ6AFjA0Zg+mttEtMzhzzaV7NlidYV02y19KvXOQuUNgZrGSFT6WiffpU3ldP/4zrhJYayvWAAAAAElFTkSuQmCC",
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABAUlEQVR4nO1V0QrEIAxrxf//5R6MOTKtscrk7mABX1zbxNhOkRc/AIO1m6dBOr6YHWujiG7dNBO8Sn4eritAVVU2OUHJiwBBEUXIAyKG5CjgSRFGyJtN9YIwGUR5sTTXw1lPWRPeUPUFG1fKjH2GsZkl1UKgmHmuRO68Rmp5xkWcaQnlRQRMYaZRUSDm5TlKXhiBE8XismxC9EqSfAE4igr7y40UJLxtLV+BqobtjfzEcunG4B9sadZpXSHWO2/DPMHABUUBvdGJCum5xERoEYDJpGmGNpR8T2j9EF0C6uTgy9dwO3V6briWmLO3iuZanSd++aRR1AdCK3byvnjxZ/gA7suy49+lBREAAAAASUVORK5CYII="
+  ];
+  var i = 0, cat = document.getElementById("cat");
+  setInterval(function () { i = (i + 1) % 2; cat.src = f[i]; }, 200);
+</script>
+</body>
+</html>
