@@ -23,7 +23,7 @@ Inspired by [uint23/xpet](https://github.com/uint23/xpet), MSXPET reimagines the
 
 ## Showcase
 
-*More demo media landing with v0.1.0 — she photographs poorly when startled.*
+*More demo media on the way — she photographs poorly when startled.*
 
 ## Install
 
@@ -91,9 +91,9 @@ Porting challenges addressed: Y-axis flips, walk-phase preservation, top-down pi
 
 ## Roadmap
 
+- [x] v0.1.0 / v0.1.1 releases + Homebrew cask (`superhexxxy/tap/msxpet`)
 - [ ] Scriptable pets: JSON-based behavior packs with JavaScriptCore hooks
 - [ ] Optional local personality model for richer, on-device dialogue and memory
-- [ ] v0.1.0 release
 
 ## Contributing
 
