@@ -7,12 +7,18 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: "6.0"
+      # NOTE: swift-actions' hosted toolchain links XCTest against a
+      # mismatched Xcode (runner crashes AFTER green suites with an
+      # XCTestCore dlopen error). Use the runner's full Xcode toolchain
+      # via /usr/bin/swift so build+test share one consistent toolchain.
+      - name: Select Xcode toolchain
+        run: |
+          sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort | tail -1)"
+          xcodebuild -version
+          /usr/bin/swift --version
       - name: Build
-        run: swift build -v
+        run: /usr/bin/swift build -v
       - name: Test
-        run: swift test -v
+        run: /usr/bin/swift test -v
       - name: Bundle .app
         run: zsh Scripts/build-app.sh
