@@ -23,10 +23,21 @@ jobs:
           (cd dist && zip -qr MSXPET.zip MSXPET.app)
           hdiutil create -volname MSXPET -srcfolder dist/MSXPET.app -ov -format UDZO dist/MSXPET.dmg
           ls -lh dist/
+      - name: Release notes from CHANGELOG
+        run: |
+          VER="${GITHUB_REF#refs/tags/v}"
+          awk -v ver="$VER" '
+            $0 ~ "^## \\[" ver "\\]" { f = 1; next }
+            /^## \[/ { f = 0 }
+            f { print }
+          ' CHANGELOG.md > /tmp/notes.md
+          test -s /tmp/notes.md || echo "MSXPET $GITHUB_REF" > /tmp/notes.md
+          head -5 /tmp/notes.md
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/MSXPET.zip
             dist/MSXPET.dmg
-          generate_release_notes: true
+          body_path: /tmp/notes.md
+          generate_release_notes: false
