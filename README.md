@@ -7,7 +7,7 @@
 MSXPET is a native macOS desktop pet for Apple Silicon (ARM64) — lightweight, responsive, and designed to be an unobtrusive little companion on your screen. Run a single pet or a clowder of up to three; they roam, nap, purr, and interact with each other and your cursor.
 
 <p align="center">
-  <img src="docs/assets/running.gif" width="480" alt="neko running across">
+  <img src="docs/assets/hero.png" width="720" alt="MSXPET — super pawsome desktop pet">
 </p>
 
 Inspired by [uint23/xpet](https://github.com/uint23/xpet), MSXPET reimagines the experience for modern AppKit on macOS 13+.
@@ -103,13 +103,3 @@ See CONTRIBUTING.md for the full guide.
 - Upstream art and ported logic: GPL-3.0 (`LICENSES/GPL-3.0.txt` and `ATTRIBUTION.md`) — because upstream sprites and logic are included, the bundled app remains GPL-licensed.
 
 Thanks to the original project for inspiration: [uint23/xpet](https://github.com/uint23/xpet).
-
-```
-█   █  ████ █   █ ████  █████ █████
-██ ██ █     █   █ █   █ █       █
-█ █ █ █      █ █  █   █ █       █
-█   █  ███    █   ████  ████    █
-█   █     █  █ █  █     █       █
-█   █     █ █   █ █     █       █
-█   █ ████  █   █ █     █████   █
-```
