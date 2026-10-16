@@ -23,7 +23,11 @@ Inspired by [uint23/xpet](https://github.com/uint23/xpet), MSXPET reimagines the
 
 ## Showcase
 
-*More demo media on the way — she photographs poorly when startled.*
+<p align="center">
+  <img src="docs/assets/demo.gif" width="480" alt="neko walks in, says hewwo, dons santa hat, catches the laser">
+</p>
+
+*Scripted showreel — regenerate anytime with `python3 Tools/make_demo.py`. She photographs poorly when startled.*
 
 ## Install
 
