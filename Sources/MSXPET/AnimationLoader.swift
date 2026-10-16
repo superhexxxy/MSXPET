@@ -1,5 +1,4 @@
-// AnimationLoader: loads PNG frames from .app Resources or SwiftPM Bundle.module.
-// Falls back to procedurally drawn placeholders so M0 runs without assets.
+// AnimationLoader: loads PNG frames from .app Resources (or dev checkout).
 // Real assets: run Tools/convert_assets.py on upstream pets/*.xpm -> Resources/pets/.
 
 import AppKit
@@ -49,15 +48,13 @@ public enum AnimationLoader {
     }
 }
 
-/// Shared resource lookup: .app bundle first, then SwiftPM module bundle,
-/// then dev-checkout fallbacks. Used by animation, sound, and overlays.
+/// Shared resource lookup: .app bundle first, then dev-checkout fallbacks.
+/// Used by animation, sound, and overlays.
+/// NOTE: deliberately no Bundle.module — see Package.swift.
 public enum AppResources {
     public static func bases() -> [URL] {
         var bases: [URL] = []
         if let r = Bundle.main.resourceURL { bases.append(r) }
-        #if SWIFT_PACKAGE
-        bases.append(Bundle.module.resourceURL ?? Bundle.module.bundleURL)
-        #endif
         // Dev fallback: Sources/MSXPET/Resources next to checkout
         let fm = FileManager.default
         let cwd = URL(fileURLWithPath: fm.currentDirectoryPath)

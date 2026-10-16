@@ -3,6 +3,20 @@
 All notable changes to MSXPET, newest first. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.1] — The one that actually launches
+
+- **Fix: release builds died instantly on any machine but the dev's.**
+  SwiftPM's generated `Bundle.module` accessor `fatalError`s when its
+  `.bundle` isn't beside the binary — and that bundle only ever exists
+  inside `.build/` on the machine that compiled it. Every v0.1.0
+  download was stillborn; local runs were masked by `.build` lying
+  around. Fixed by dropping `resources:` from `Package.swift` entirely
+  (the `.app` carries its own `Resources/` via `Scripts/build-app.sh`)
+  and resolving everything through `Bundle.main` + checkout fallbacks.
+  Verified by running the shipped binary with `.build` hidden, plus a
+  real `brew install` smoke test.
+- If you grabbed v0.1.0: it cannot run — please take v0.1.1 instead.
+
 ## [0.1.0] — First release 🎉
 
 The whole pet, polished and production-ready.
