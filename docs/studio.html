@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="description" content="MSXPET Studio — draw pixel accessories for your desktop pet.">
+<title>MSXPET Studio — pixel accessory maker</title>
+<style>
+  :root { --ink: #111; --grey: #666; --line: #ddd; --paper: #fff; --wash: #f5f5f5; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--paper); color: var(--ink);
+         font: 14px/1.7 ui-monospace, Menlo, Consolas, monospace;
+         -webkit-font-smoothing: antialiased; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 20px 64px; }
+  header { text-align: center; }
+  h1 { font-size: 22px; letter-spacing: 5px; }
+  .tag { color: var(--grey); font-size: 13px; }
+  hr { border: 0; border-top: 1px dashed var(--line); margin: 22px 0; }
+  h2 { font-size: 12px; letter-spacing: 3px; color: var(--grey); margin-bottom: 10px; }
+  h2::before { content: "// "; }
+  .studio { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 720px) { .studio { grid-template-columns: 1fr; } }
+  canvas.px { width: 100%; aspect-ratio: 1; image-rendering: pixelated;
+              border: 2px solid var(--ink); touch-action: none; cursor: crosshair;
+              background: #fff
+                repeating-conic-gradient(var(--wash) 0% 25%, #fff 0% 50%) 0 0 / 32px 32px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  button, .sw { font: inherit; font-size: 13px; background: var(--paper);
+                color: var(--ink); border: 1px solid var(--ink); padding: 8px 12px;
+                min-height: 44px; cursor: pointer; }
+  button.on { background: var(--ink); color: var(--paper); }
+  button:active { transform: translateY(1px); }
+  .sw { width: 44px; height: 44px; padding: 0; }
+  .sw.on { outline: 3px solid var(--ink); outline-offset: 2px; }
+  input[type=text] { font: inherit; font-size: 13px; border: 1px solid var(--ink);
+                     padding: 8px 10px; width: 160px; }
+  input[type=color] { width: 44px; height: 44px; border: 1px solid var(--ink);
+                      padding: 2px; background: var(--paper); }
+  .hint { color: var(--grey); font-size: 12px; }
+  #preview { border: 2px solid var(--ink); }
+  .gal { display: flex; gap: 16px; flex-wrap: wrap; }
+  .gal figure { text-align: center; font-size: 12px; color: var(--grey); }
+  .gal canvas { width: 128px; height: 128px; image-rendering: pixelated;
+                border: 1px solid var(--ink); }
+  nav { text-align: center; }
+  nav a { color: var(--ink); text-decoration: none; border-bottom: 2px solid var(--ink);
+          margin: 0 10px; font-size: 13px; letter-spacing: 1px; }
+  footer { text-align: center; color: var(--grey); font-size: 12px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>MSXPET STUDIO</h1>
+    <p class="tag">draw hats. ship hats. <a href="index.html" style="color:inherit">← home</a></p>
+  </header>
+  <hr>
+  <div class="studio">
+    <section>
+      <h2>CANVAS · <span id="tabname">default</span></h2>
+      <canvas id="ed" class="px" width="32" height="32"></canvas>
+      <div class="row" id="tabs"></div>
+      <div class="row" id="tools"></div>
+      <div class="row" id="pal"></div>
+      <div class="row">
+        <input type="color" id="custom" value="#d42a2a" title="custom color">
+        <button id="gridbtn" class="on">GRID</button>
+        <button id="ghostbtn" class="on">GHOST</button>
+        <button id="mirrorbtn">MIRROR</button>
+        <button id="undo">UNDO</button>
+        <button id="redo">REDO</button>
+        <button id="clear">CLEAR</button>
+      </div>
+      <p class="hint">tip: ghost shows the neko underneath. draw hats rows 0–12, shades over the eyes.</p>
+    </section>
+    <section>
+      <h2>LIVE PREVIEW</h2>
+      <canvas id="preview" class="px" width="64" height="64"></canvas>
+      <p class="hint">your art, on the real walk cycle, 5fps. like the app.</p>
+      <h2 style="margin-top:16px">ACCESSORY ID</h2>
+      <div class="row"><input type="text" id="aid" value="my_hat" maxlength="24"></div>
+      <h2>DOWNLOAD</h2>
+      <div class="row" id="dls"></div>
+      <p class="hint">drop the folder in Overlays → Accessories → Reload Assets. <a href="https://github.com/superhexxxy/MSXPET/blob/main/ASSETS.md" style="color:inherit">full guide</a>.</p>
+    </section>
+  </div>
+  <hr>
+  <h2>GALLERY · bundled, click to load</h2>
+  <div class="gal" id="gal"></div>
+  <hr>
+  <nav><a href="index.html">HOME</a><a href="https://github.com/superhexxxy/MSXPET">GITHUB</a></nav>
+  <hr>
+  <footer>32×32 · RGBA · ride the bobble</footer>
+</main>
+<script>
+"use strict";
+/* embedded reference sprites + bundled art (regenerate: see Tools/) */
+var DATA = {"pets/neko/idle/0.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA70lEQVR4nO1WWw7DIAwjEfe/sqdWY6KMR5ywSZXqr6qQ2HF4pfTghkBw/AJlyQHMSFbjYQEnBiSFnIISc80EjAtKCJiRuKpnBMwIEHEhGwWMVKUo1BMkItT/7QJ2Qm8pAIPee9ZEZibXPS5kx7/6mxUjBD+1199iZGcLxLrKreTmSQ0+NtSONOLMebNDQEmOHQWpQ0B3PbDXcEQAFtvwLw+SIX7xIIHHWmusrhIcFc2qmmzNZexKwMXu3mk3E9SJRXgNgHuSxc8B6VTDonGsTSQjAbAQl+T1hfSVqHNpVfEYNZQp+cjhtUiccQ/SNrwAQ6ib3TqE0ZYAAAAASUVORK5CYII=", "pets/neko/idle/1.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA7ElEQVR4nO1Wyw4DIQgU4v//Ms22tWEtIoP20MQ5bVZhhpdaysEBDllcv4FRchHxSGbrywKeGJA0cggM7A0TIFlgQIBHkooeEeARyEoWalDASFVZBWeMiAj6v13ATvBfCpBB7TM9UZHNusaN7Pqnv1ExBPBDs/4WQztLQNEuj5KHN3X4pEFnpBMX9lsTAppz2REQJQS8zlijH1QW6FcCJNKISA9whBR95SC2HInYu9mcyZjazgTc0m0dNp4gw1aWj2LBXkTrY0hGNCi6jPWOqKKjZjnX98GXI+POUPYyKigS8uUjmyJK2h2UbXgAN8qL8Ylnq3gAAAAASUVORK5CYII=", "pets/neko/idle/2.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA4UlEQVR4nO1WyxLDIAgUx///5e2kUzvEKmGF3txTJgK7PCQp5eDggAeC5zdUlhyARfJ0HhbwxoKkk1OohK2bgKlCJQRYJFvZMwIsAkSq0JwCVqpKFHXHSUSo9+kCMlEzS7/TksYY6xJ3suudfmbFCMFPXbWPGMlsgXiHzEvuNhrwLYOuyCDOHbdtCOjBkZFQ++OnOK0FULauQVQzoH23hhAXobXXjcF89H0ScMt2dtctQRNfhDchuP+B+BDKJBsWQ8XGQLISAA9xD67X8U+gycpW/lg1lElZTzsL2fQ7KGl4AYbUh/MSua/6AAAAAElFTkSuQmCC", "pets/neko/idle/3.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA30lEQVR4nO1Vyw7DIAwjqP//y56YxJZmPGJID5PwqQISO4kLKR0cHPwhsLl/Q2bJAYxIZvvbAt7okFRyCpk46yZgupAJAT0SrFZfIH4+nkBEphyZzvpN7F4PFxCJvBLUG8fKmC7msG5xJStr+psVIwQ/ZUSPAQuYEYjXZF5y9yGDTxt0R4w4ecQDJjkiCroefAnDRgB11mVE5QEdu2RCFMLR4zIw5jR2JuBWbetfHwlqxGL7JgT3HO+bUBrVsDAds4mkJwAe4ppcX8c/iRpXtopHb6BMydrtLGQx7iCF4QU7goD5zOjf2AAAAABJRU5ErkJggg==", "pets/neko/idle/4.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA4UlEQVR4nO1WyxLDIAgUx///5e2kUzvEKmGF3txTJgK7PCQp5eDggAeC5zdUlhyARfJ0HhbwxoKkk1OohK2bgKlCJQRYJFvZMwIsAkSq0JwCVqpKFHXHSUSo9+kCMlEzS7/TksYY6xJ3suudfmbFCMFPXbWPGMlsgXiHzEvuNhrwLYOuyCDOHbdtCOjBkZFQ++OnOK0FULauQVQzoH23hhAXobXXjcF89H0ScMt2dtctQRNfhDchuP+B+BDKJBsWQ8XGQLISAA9xD67X8U+gycpW/lg1lElZTzsL2fQ7KGl4AYbUh/MSua/6AAAAAElFTkSuQmCC", "pets/neko/idle/5.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA7ElEQVR4nO1Wyw4DIQgU4v//Ms22tWEtIoP20MQ5bVZhhpdaysEBDllcv4FRchHxSGbrywKeGJA0cggM7A0TIFlgQIBHkooeEeARyEoWalDASFVZBWeMiAj6v13ATvBfCpBB7TM9UZHNusaN7Pqnv1ExBPBDs/4WQztLQNEuj5KHN3X4pEFnpBMX9lsTAppz2REQJQS8zlijH1QW6FcCJNKISA9whBR95SC2HInYu9mcyZjazgTc0m0dNp4gw1aWj2LBXkTrY0hGNCi6jPWOqKKjZjnX98GXI+POUPYyKigS8uUjmyJK2h2UbXgAN8qL8Ylnq3gAAAAASUVORK5CYII=", "pets/neko/walk_east/0.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABDklEQVR4nO2W6w6DMAiFC/H9X5lF0zqKXFqs8Y8n2Zb0wvkGxVrKp5cFiT10c38agI4v+vsDwG0QyBhfgtwAgcjcMzZApiCwLFSFpVUANPPvJyCIz+NK8wFd4uIT5koWyIqLljk72aYG1pzGIi5oACQJI4N9vbZmH2umUTZRM8+0kwQbFcqBWXMrCwFc1wVk1Gd5JzRQDoFi8jFzS6iY16GxtLYDJ8faZwQAjJoPQ2hAvKwi9VyUvozEDZgq2QEXAVQKabrEfP/Zpnf25QozpM3zMweOUdeeWhac4BxWIzwXbQ6AFjA0Zg+mttEtMzhzzaV7NlidYV02y19KvXOQuUNgZrGSFT6WiffpU3ldP/4zrhJYayvWAAAAAElFTkSuQmCC", "pets/neko/walk_east/1.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABAUlEQVR4nO1V0QrEIAxrxf//5R6MOTKtscrk7mABX1zbxNhOkRc/AIO1m6dBOr6YHWujiG7dNBO8Sn4eritAVVU2OUHJiwBBEUXIAyKG5CjgSRFGyJtN9YIwGUR5sTTXw1lPWRPeUPUFG1fKjH2GsZkl1UKgmHmuRO68Rmp5xkWcaQnlRQRMYaZRUSDm5TlKXhiBE8XismxC9EqSfAE4igr7y40UJLxtLV+BqobtjfzEcunG4B9sadZpXSHWO2/DPMHABUUBvdGJCum5xERoEYDJpGmGNpR8T2j9EF0C6uTgy9dwO3V6briWmLO3iuZanSd++aRR1AdCK3byvnjxZ/gA7suy49+lBREAAAAASUVORK5CYII=", "pets/neko/walk_west/0.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABEUlEQVR4nO2W6wrDIAyFPWHv/8oOobE2y8VYx/ajB2SjxJzPGG1LefRjYVOeupoTO4xrPf0BpHJjl/FH4kkQrJh7xgaI6UPfNJ8RjclFM20xP+bUqQrUIHhVXl5yguvO0lsQNPwHd24LNkC8bg9jNAiKqHloRu1ZVBk5T0JQiH+duKpeXQlBd853EuoCwSJpPrOnGYmSX/qs/WQvoq0QTSFAC+Yhk85WS7mOO8RLHgttK+40oPMuAAOoBjPHa6zCKiROv3wCCeFUMXwbwtpPbf9HI4YYbs/cIorIacT055qJ1i/jPeF9E5BiJkefzCvWSh6BWULJKbywhp7o/eV5IQmgQeDO1zEWADwjd7WPHv2l3pB/uQtrbX1iAAAAAElFTkSuQmCC", "pets/neko/walk_west/1.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA+0lEQVR4nO1V0RKDMAgrPf//l7OrszuKCMUx99I8OKeQhLZgKQt/Bl08h/EuA41/R50JyhYH0C62AbwD8AtxjupEZ5oYxIn2HSbTQKIJVbxdNAMwTCBTfLjRgjVIAkv4IDRzN028BTpGrtr0k+QVohmYQiM+Khke93dR1HDG+WAOfR3IGwyAEwQqcc/M7S0gscxS6Fth1wCSBDzU45eUg/UISPzHE6vA5wE5sSFDE/MjbgDBVehbOTlRi2Xg9nDhAhZHi9ki4l51V61rtTRp4ppA31+nW6YONeciT5xXLcTv9O3wwZMk2ndbLmPGsOgiKiHYPWkJCwsLJRkvgGSy4Hr/L+oAAAAASUVORK5CYII=", "pets/neko/walk_south/0.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA7UlEQVR4nO2WbQvDIAyETej//8sZ3RSsmJczbvviQVtQe/c0VrGUnKRey+JMuIjctwbyc4At4j02B2BdFzhegn0UNSQkvP7xvilR2Jt3h9fB78cuAEHCUQj+RjgCwahpnd9wvwfBaPhtqEF4/SiAaOWfhbRwbbxWBY6SWgERwO07oXQhCNwSABkB2pdGq3CVhDJL1KuApJ2DvqwM/GzmwHKy1PlQuAJSj1szCGsfmLVZRzcOkqdk+bD3UvZHa+9rEKzl9/M1TkUPZbUP8A/PvtHTwyVSkcnX0pYTURkblEog/gQAuEBJv6Oj8he9AKe6gB36pg2tAAAAAElFTkSuQmCC", "pets/neko/walk_south/1.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA+klEQVR4nNVWAQ7EIAgTs/9/mYs7d0GnQhWTs8mShQGtOMEQ7OD8aLaR/YVoJWf+5WNpy3ZJ9jW87UsCbggRLn4JkIAdiGD5tdIivmYBVhTkVlxwRGOPZ4iP+ge2Ip4ggIhoKnmOI9cKkCIGFRuR45WSp/ceSf19Wx/ghoiHHEW0OiIEoypNCxiRzK7+jjX4yPFaBotVKt/JtRV7tGBtC9h6owHQzHl1nJ+SeYng3jZEJbAZNOoDSB6LgP+YBWEN5JGcR0dt9ggmmLeg190QUct9gCsRkkRrSi4CEuRkrCsy05gI8C3GcifW4nPeMdx6IwogLDNixxzZhw/MfpMVys1saQAAAABJRU5ErkJggg==", "pets/neko/walk_north/0.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAA10lEQVR4nO1X0Q6EIAxbl/v/X94lF82BN1wZGEzOvoGjLZNUgeRhhzEyJEiKiVk9BSDFD9JAofvjxTNC8yorXIp7u93ntppP/UwDEu08W6uyGJjx3kfOAxgDjqMzwS4NrO6Acjw1RzRmxamCDVULvI5cHUTWEnZJv2aGDVjzARfFoQ4i8TL9ejrgpCa6D6ElxPd1h2i+bxJqVNC7e68LQwYsGULsWu0JoAyiQFJZDH0MyDmGzsGs/4Gl3wLqq+h0ieZ9sYUO8ZSLicpi6N8bGAV9A3ogDbwBdIBeOPGHqPAAAAAASUVORK5CYII=", "pets/neko/walk_north/1.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABAklEQVR4nOVW7RIDEQyUzL3/K6fjZrSRIiuYTtv9c8jHLiegFIeYPkWS0CTJyyC1iWiYqmvkEbkmKe38teR2vBEnEQFVsjxD3bYoY9lHtz1wAoEki/hy+jDYc9BLX9DbA7bvbMwbF6LSJuotMUIYEiDgP50sTbwKyCTy+mUMEU4+/7uAVuKWCBVLy7+AnBlpGzp7WIAW0SIspD3bFgEZ6ArMgB07RUpLBd+fFQFVMkQM6vf0Tz7E2/lOVayvgHQIyhXcK0EE7HPHNpcSId99G54GH2f4WQHSeLBGcEUD0UfK6aOYRgfN1qPYSRy+M3g2YDCrkAjeRL4kAkHeYXLQP/0vHlt7mTIHCkj0AAAAAElFTkSuQmCC", "overlays/santa_hat/overlay.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAjUlEQVR4nO3UMQ6AIAwF0Ja4eQhHEhdP7YFMWOAezDUOGAdFkBKX/yZNSP8vA0ydiIikb2bmp3Omd/jd/9XQGubm+XF4EkIg9QIuE3xcedr6CLfWsloB97LxFuNZomSe0Qz/wmiHL+NI6zSJagFXuXltiSzvvbTIT6c+70AN83eBoeRQ7iEBAAAAAKBGO2jMa3vBbkYLAAAAAElFTkSuQmCC", "overlays/witch_hat/overlay.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAgklEQVR4nGNkoABoqzj8h7Gv3jnASI4ZTNSwnBLARA1DyPU92Q5A9z0locHEQCVAriOY6GUR1RxAbccxUdsCUh3BSKzCF01yJBksUfeIKLMZaRnvxGRPRlwSIiJSVE1sb948YyQ6DYhQ2XJ8ZjJR26JRMApGwSgYBaNgFIyCUTDkAADNTSF7W3vWIAAAAABJRU5ErkJggg==", "overlays/shades/overlay.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAV0lEQVR4nO3QsQ3AIAxEUcMMrth/taSBHaCiwxgSJJr/Sh86GYsAwGVh9aFqqqN5KW+YZV5vlA05P+Zio+zYBdT44QrvCvFvyddsawGrrM9mGQAAAMTRABEoJfnc/JlkAAAAAElFTkSuQmCC"};
+/* ---------- state ---------- */
+var S = 32;
+var TABS = ["default", "walk_east", "walk_west", "walk_south", "walk_north"];
+var grids = {};   // tab -> 32x32 of css-color|null
+var undoSt = {}, redoSt = {};
+TABS.forEach(function (t) { grids[t] = blank(); undoSt[t] = []; redoSt[t] = []; });
+var tab = "default", tool = "pencil", color = "#14141a", mirror = false, showGrid = true, showGhost = true;
+function blank() { var g = []; for (var y = 0; y < S; y++) { g.push(new Array(S).fill(null)); } return g; }
+function snap() { return grids[tab].map(function (r) { return r.slice(); }); }
+function pushUndo() { undoSt[tab].push(snap()); if (undoSt[tab].length > 50) undoSt[tab].shift(); redoSt[tab] = []; }
+/* ---------- images ---------- */
+var REF = {};   // state -> Image (ghost + preview pet)
+var GAL = {};   // bundled overlay name -> Image
+function loadAll(done) {
+  var need = 0, total = 0;
+  function one(key, put) {
+    total++;
+    var i = new Image();
+    i.onload = function () { put(i); if (++need === total) done(); };
+    i.src = "data:image/png;base64," + DATA[key];
+  }
+  [["pets/neko/idle/0.png", "idle0"], ["pets/neko/walk_east/0.png", "east0"],
+   ["pets/neko/walk_west/0.png", "west0"], ["pets/neko/walk_south/0.png", "south0"],
+   ["pets/neko/walk_north/0.png", "north0"], ["pets/neko/walk_north/1.png", "north1"],
+   ["pets/neko/walk_west/1.png", "west1"],
+   ["pets/neko/idle/1.png", "idle1"], ["pets/neko/idle/2.png", "idle2"],
+   ["pets/neko/walk_east/1.png", "east1"], ["pets/neko/walk_south/1.png", "south1"]
+  ].forEach(function (kv) { one(kv[0], function (im) { REF[kv[1]] = im; }); });
+  [["overlays/santa_hat/overlay.png", "santa_hat"], ["overlays/witch_hat/overlay.png", "witch_hat"],
+   ["overlays/shades/overlay.png", "shades"]
+  ].forEach(function (kv) { one(kv[0], function (im) { GAL[kv[1]] = im; }); });
+}
+var GHOST_OF = { "default": "idle0", "walk_east": "east0", "walk_west": "west0", "walk_south": "south0", "walk_north": "north0" };
+/* ---------- editor ---------- */
+var ed = document.getElementById("ed"), ectx = ed.getContext("2d");
+ectx.imageSmoothingEnabled = false;
+function drawEd() {
+  ectx.clearRect(0, 0, ed.width, ed.height);
+  if (showGhost && REF[GHOST_OF[tab]]) { ectx.globalAlpha = 0.22; ectx.drawImage(REF[GHOST_OF[tab]], 0, 0); ectx.globalAlpha = 1; }
+  var g = grids[tab];
+  for (var y = 0; y < S; y++) for (var x = 0; x < S; x++)
+    if (g[y][x]) { ectx.fillStyle = g[y][x]; ectx.fillRect(x, y, 1, 1); }
+  if (showGrid) {
+    ectx.strokeStyle = "rgba(0,0,0,0.08)"; ectx.lineWidth = 0.05; ectx.beginPath();
+    for (var i = 1; i < S; i++) { ectx.moveTo(i, 0); ectx.lineTo(i, S); ectx.moveTo(0, i); ectx.lineTo(S, i); }
+    ectx.stroke();
+  }
+  document.getElementById("tabname").textContent = tab.replace("_", " ");
+}
+function cell(ev) {
+  var r = ed.getBoundingClientRect();
+  var x = Math.floor((ev.clientX - r.left) / r.width * S);
+  var y = Math.floor((ev.clientY - r.top) / r.height * S);
+  return [Math.max(0, Math.min(S - 1, x)), Math.max(0, Math.min(S - 1, y))];
+}
+var painting = false;
+function paintAt(x, y) {
+  var g = grids[tab];
+  function set(px, py, v) { if (px >= 0 && px < S && py >= 0 && py < S) g[py][px] = v; }
+  if (tool === "pencil") { set(x, y, color); if (mirror) set(S - 1 - x, y, color); }
+  else if (tool === "eraser") { set(x, y, null); if (mirror) set(S - 1 - x, y, null); }
+  else if (tool === "fill") { flood(x, y, g[y][x]); if (mirror) flood(S - 1 - x, y, grids[tab][y][S - 1 - x]); }
+}
+function flood(x, y, target) {
+  var g = grids[tab], want = tool === "eraser" ? null : color;
+  if (target === want) return;
+  var st = [[x, y]];
+  while (st.length) {
+    var p = st.pop(), cx = p[0], cy = p[1];
+    if (cx < 0 || cx >= S || cy < 0 || cy >= S || g[cy][cx] !== target) continue;
+    g[cy][cx] = want;
+    st.push([cx + 1, cy], [cx - 1, cy], [cx, cy + 1], [cx, cy - 1]);
+  }
+}
+ed.addEventListener("pointerdown", function (ev) {
+  ev.preventDefault(); painting = true; pushUndo();
+  var c = cell(ev); paintAt(c[0], c[1]); drawEd(); drawPreview();
+});
+ed.addEventListener("pointermove", function (ev) {
+  if (!painting || tool === "fill") return;
+  ev.preventDefault(); var c = cell(ev); paintAt(c[0], c[1]); drawEd();
+});
+window.addEventListener("pointerup", function () { if (painting) { painting = false; drawPreview(); } });
+/* toolbar */
+var TOOLS = ["pencil", "eraser", "fill"];
+var toolsEl = document.getElementById("tools");
+TOOLS.forEach(function (t) {
+  var b = document.createElement("button");
+  b.textContent = t.toUpperCase(); if (t === tool) b.className = "on";
+  b.onclick = function () { tool = t;
+    Array.prototype.forEach.call(toolsEl.children, function (c) { c.className = ""; });
+    b.className = "on"; };
+  toolsEl.appendChild(b);
+});
+var tabsEl = document.getElementById("tabs");
+function syncTabs() {
+  Array.prototype.forEach.call(tabsEl.children, function (c) {
+    c.className = (c.textContent.toLowerCase() === (tab === "default" ? "default" : tab.replace("walk_", ""))) ? "on" : ""; });
+}
+TABS.forEach(function (t) {
+  var b = document.createElement("button");
+  b.textContent = t === "default" ? "DEFAULT" : t.replace("walk_", "").toUpperCase();
+  b.onclick = function () { tab = t; syncTabs(); drawEd(); };
+  tabsEl.appendChild(b);
+});
+syncTabs();
+var PRESETS = ["#ffffff", "#14141a", "#d42a2a", "#e8821e", "#2b2440", null];
+var palEl = document.getElementById("pal");
+PRESETS.forEach(function (c) {
+  var b = document.createElement("button");
+  b.className = "sw" + (c === color ? " on" : "");
+  b.title = c === null ? "transparent" : c;
+  b.style.background = c === null ? "repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 0 0 / 12px 12px" : c;
+  b.onclick = function () {
+    if (c === null) { tool = "eraser"; }
+    else { color = c; tool = "pencil"; document.getElementById("custom").value = c; }
+    syncTools(); drawEd();
+  };
+  palEl.appendChild(b);
+});
+function syncTools() {
+  Array.prototype.forEach.call(toolsEl.children, function (c) {
+    c.className = (c.textContent.toLowerCase() === tool) ? "on" : ""; });
+}
+document.getElementById("custom").oninput = function (e) { color = e.target.value; tool = "pencil"; syncTools(); };
+function tgl(id, fn) { document.getElementById(id).onclick = function () { this.classList.toggle("on"); fn(this.classList.contains("on")); }; }
+tgl("gridbtn", function (v) { showGrid = v; drawEd(); });
+tgl("ghostbtn", function (v) { showGhost = v; drawEd(); });
+tgl("mirrorbtn", function (v) { mirror = v; });
+document.getElementById("undo").onclick = function () {
+  if (!undoSt[tab].length) return;
+  redoSt[tab].push(snap()); grids[tab] = undoSt[tab].pop(); drawEd(); drawPreview(); };
+document.getElementById("redo").onclick = function () {
+  if (!redoSt[tab].length) return;
+  undoSt[tab].push(snap()); grids[tab] = redoSt[tab].pop(); drawEd(); drawPreview(); };
+document.getElementById("clear").onclick = function () { pushUndo(); grids[tab] = blank(); drawEd(); drawPreview(); };
+/* ---------- preview (real 5fps cycle) ---------- */
+var pv = document.getElementById("preview"), pctx = pv.getContext("2d");
+pctx.imageSmoothingEnabled = false;
+var CYCLE = [["idle0", "default"], ["idle1", "default"], ["idle2", "default"],
+             ["east0", "walk_east"], ["east1", "walk_east"],
+             ["west0", "walk_west"], ["west1", "walk_west"],
+             ["south0", "walk_south"], ["south1", "walk_south"],
+             ["north0", "walk_north"], ["north1", "walk_north"]];
+var cyc = 0;
+function gridToImg(g) {
+  var c = document.createElement("canvas"); c.width = c.height = S;
+  var x = c.getContext("2d");
+  for (var yy = 0; yy < S; yy++) for (var xx = 0; xx < S; xx++)
+    if (g[yy][xx]) { x.fillStyle = g[yy][xx]; x.fillRect(xx, yy, 1, 1); }
+  return c;
+}
+function artFor(stateTab) {
+  function nonEmpty(g) {
+    for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) if (g[y][x]) return true;
+    return false;
+  }
+  if (grids[stateTab] && nonEmpty(grids[stateTab])) return gridToImg(grids[stateTab]);
+  if (nonEmpty(grids["default"])) return gridToImg(grids["default"]);
+  return null;
+}
+function drawPreview() {
+  var step = CYCLE[cyc % CYCLE.length];
+  pctx.clearRect(0, 0, 64, 64);
+  if (REF[step[0]]) pctx.drawImage(REF[step[0]], 16, 16, 32, 32);
+  var art = artFor(step[1]);
+  if (art) pctx.drawImage(art, 16, 16, 32, 32);
+}
+setInterval(function () { cyc++; drawPreview(); }, 200);
+/* ---------- downloads (exact app filenames) ---------- */
+function dlURL(url, name) {
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function pngOf(tabName) {
+  var c = gridToImg(grids[tabName]), out = document.createElement("canvas");
+  out.width = out.height = S;
+  out.getContext("2d").drawImage(c, 0, 0);
+  return out.toDataURL("image/png");
+}
+function nonEmptyTab(t) {
+  var g = grids[t];
+  for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) if (g[y][x]) return true;
+  return false;
+}
+var dlsEl = document.getElementById("dls");
+function refreshDls() {
+  dlsEl.innerHTML = "";
+  var files = [["overlay.png", "default"]];
+  TABS.forEach(function (t) {
+    if (t !== "default" && nonEmptyTab(t)) files.push([t + ".png", t]);
+  });
+  files.forEach(function (f) {
+    if (f[1] === "default" && !nonEmptyTab("default")) return;
+    var b = document.createElement("button");
+    b.textContent = f[0];
+    b.onclick = function () { dlURL(pngOf(f[1]), f[0]); };
+    dlsEl.appendChild(b);
+  });
+  var j = document.createElement("button");
+  j.textContent = "bundle.json";
+  j.onclick = function () {
+    var o = { id: document.getElementById("aid").value || "my_hat", files: {} };
+    files.forEach(function (f) {
+      if (f[1] === "default" && !nonEmptyTab("default")) return;
+      o.files[f[0]] = pngOf(f[1]);
+    });
+    dlURL("data:application/json," + encodeURIComponent(JSON.stringify(o)), o.id + ".msxpet.json");
+  };
+  dlsEl.appendChild(j);
+}
+setInterval(refreshDls, 1500);
+/* ---------- gallery (bundled, click to load) ---------- */
+var galEl = document.getElementById("gal");
+var galTick = 0;
+setInterval(function () { galTick++; drawGal(); }, 400);
+function drawGal() {
+  galEl.innerHTML = "";
+  Object.keys(GAL).forEach(function (name) {
+    var fig = document.createElement("figure");
+    var c = document.createElement("canvas");
+    c.width = c.height = 64;
+    var x = c.getContext("2d");
+    x.imageSmoothingEnabled = false;
+    var fr = galTick % 2 ? REF.idle1 : REF.idle0;
+    if (fr) x.drawImage(fr, 16, 16, 32, 32);
+    x.drawImage(GAL[name], 16, 16, 32, 32);
+    var cap = document.createElement("figcaption");
+    cap.textContent = name;
+    fig.appendChild(c); fig.appendChild(cap);
+    fig.style.cursor = "pointer";
+    fig.onclick = function () { loadOverlayInto(name); };
+    galEl.appendChild(fig);
+  });
+}
+function loadOverlayInto(name) {
+  // trace the bundled art into the default tab as a starting point
+  var im = GAL[name], c = document.createElement("canvas");
+  c.width = c.height = S;
+  var x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(im, 0, 0);
+  var d = x.getImageData(0, 0, S, S).data;
+  pushUndo();
+  for (var yy = 0; yy < S; yy++) for (var xx = 0; xx < S; xx++) {
+    var a = d[(yy * S + xx) * 4 + 3];
+    if (a > 20) {
+      var r = d[(yy * S + xx) * 4], g = d[(yy * S + xx) * 4 + 1], b = d[(yy * S + xx) * 4 + 2];
+      grids["default"][yy][xx] = "rgb(" + r + "," + g + "," + b + ")";
+    } else grids["default"][yy][xx] = null;
+  }
+  tab = "default"; syncTabs(); drawEd(); drawPreview();
+  document.getElementById("aid").value = name + "_remix";
+}
+/* ---------- boot ---------- */
+loadAll(function () { drawEd(); drawPreview(); refreshDls(); });
+</script>
+</body>
+</html>

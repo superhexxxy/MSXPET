@@ -23,7 +23,9 @@ Two homes (user folder wins on name clashes):
 Then 🐾 → Accessories → tick it on. **Reload Assets** rescans without
 restarting. **Reveal Overlays Folder** opens yours in Finder.
 
-Making one (5 minutes, free):
+Easiest path: the [web studio](https://superhexxxy.github.io/MSXPET/studio.html) — draw, preview on the real walk cycle, download exact filenames.
+
+Making one by hand (5 minutes, free):
 
 1. `python3 Tools/make_overlays.py --template` gives you a 32×32 guide, or
    just open any pet frame (`Resources/pets/neko/idle/0.png`) as tracing
