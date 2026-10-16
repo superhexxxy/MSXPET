@@ -57,24 +57,35 @@
   <hr>
   <div class="studio">
     <section>
+      <div class="row" id="modes"></div>
       <h2>CANVAS · <span id="tabname">default</span></h2>
       <canvas id="ed" class="px" width="32" height="32"></canvas>
       <div class="row" id="tabs"></div>
+      <div class="row" id="petidrow" style="display:none"><input type="text" id="pid" value="my_pet" maxlength="24"></div>
+      <div class="row" id="frames" style="display:none"></div>
       <div class="row" id="tools"></div>
       <div class="row" id="pal"></div>
       <div class="row">
         <input type="color" id="custom" value="#d42a2a" title="custom color">
+        <input type="text" id="hex" value="#14141a" maxlength="7" style="width:84px" title="hex color">
         <button id="gridbtn" class="on">GRID</button>
         <button id="ghostbtn" class="on">GHOST</button>
         <button id="mirrorbtn">MIRROR</button>
+        <button id="livebtn" class="on">LIVE</button>
         <button id="undo">UNDO</button>
         <button id="redo">REDO</button>
         <button id="clear">CLEAR</button>
       </div>
+      <div class="row" id="pettools" style="display:none">
+        <button id="copynext">COPY&rarr;NEXT</button>
+        <button id="onionbtn">ONION</button>
+      </div>
+      <div class="row" id="recent"></div>
       <p class="hint">tip: ghost shows the neko underneath. draw hats rows 0–12, shades over the eyes.</p>
     </section>
     <section>
-      <h2>LIVE PREVIEW</h2>
+      <h2>LIVE PREVIEW · <span id="pvstate"></span></h2>
+      <div class="row"><button id="artbtn" class="on">ART</button></div>
       <canvas id="preview" class="px" width="64" height="64"></canvas>
       <p class="hint">your art, on the real walk cycle, 5fps. like the app.</p>
       <h2 style="margin-top:16px">ACCESSORY ID</h2>
@@ -99,13 +110,30 @@ var DATA = {"pets/neko/idle/0.png": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr
 /* ---------- state ---------- */
 var S = 32;
 var TABS = ["default", "walk_east", "walk_west", "walk_south", "walk_north"];
-var grids = {};   // tab -> 32x32 of css-color|null
+var STATES = ["idle", "happy", "sleeping", "dragged", "swat", "cling_side", "cling_top",
+              "walk_north", "walk_south", "walk_east", "walk_west",
+              "walk_northwest", "walk_northeast", "walk_southwest", "walk_southeast"];
+var FRAMES = { idle: 6, happy: 6, sleeping: 6, dragged: 6, swat: 2, cling_side: 2, cling_top: 2,
+               walk_north: 2, walk_south: 2, walk_east: 2, walk_west: 2,
+               walk_northwest: 2, walk_northeast: 2, walk_southwest: 2, walk_southeast: 2 };
+var mode = "hat";
+var grids = {};   // accessory tab -> 32x32
+var petGrids = {}; // pet state -> [32x32 per frame]
 var undoSt = {}, redoSt = {};
-TABS.forEach(function (t) { grids[t] = blank(); undoSt[t] = []; redoSt[t] = []; });
-var tab = "default", tool = "pencil", color = "#14141a", mirror = false, showGrid = true, showGhost = true;
+TABS.forEach(function (t) { grids[t] = blank(); });
+STATES.forEach(function (st) { petGrids[st] = []; for (var i = 0; i < FRAMES[st]; i++) petGrids[st].push(blank()); });
+var tab = "default", petState = "idle", petFrame = 0;
+var tool = "pencil", color = "#14141a", mirror = false, showGrid = true, showGhost = true;
+var live = true, artOn = true, onion = false;
+var recents = [];
+function curKey() { return mode === "hat" ? "h|" + tab : "p|" + petState + "|" + petFrame; }
+function cur() { return mode === "hat" ? grids[tab] : petGrids[petState][petFrame]; }
+function setCur(g) { if (mode === "hat") grids[tab] = g; else petGrids[petState][petFrame] = g; }
 function blank() { var g = []; for (var y = 0; y < S; y++) { g.push(new Array(S).fill(null)); } return g; }
-function snap() { return grids[tab].map(function (r) { return r.slice(); }); }
-function pushUndo() { undoSt[tab].push(snap()); if (undoSt[tab].length > 50) undoSt[tab].shift(); redoSt[tab] = []; }
+function snap() { return cur().map(function (r) { return r.slice(); }); }
+function pushUndo() { var k = curKey(); undoSt[k] = undoSt[k] || []; undoSt[k].push(snap()); if (undoSt[k].length > 50) undoSt[k].shift(); redoSt[k] = []; }
+function doUndo() { var k = curKey(), u = undoSt[k] || []; if (!u.length) return; redoSt[k] = redoSt[k] || []; redoSt[k].push(snap()); setCur(u.pop()); }
+function doRedo() { var k = curKey(), r = redoSt[k] || []; if (!r.length) return; undoSt[k] = undoSt[k] || []; undoSt[k].push(snap()); setCur(r.pop()); }
 /* ---------- images ---------- */
 var REF = {};   // state -> Image (ghost + preview pet)
 var GAL = {};   // bundled overlay name -> Image
@@ -132,18 +160,32 @@ var GHOST_OF = { "default": "idle0", "walk_east": "east0", "walk_west": "west0",
 /* ---------- editor ---------- */
 var ed = document.getElementById("ed"), ectx = ed.getContext("2d");
 ectx.imageSmoothingEnabled = false;
-function drawEd() {
-  ectx.clearRect(0, 0, ed.width, ed.height);
-  if (showGhost && REF[GHOST_OF[tab]]) { ectx.globalAlpha = 0.22; ectx.drawImage(REF[GHOST_OF[tab]], 0, 0); ectx.globalAlpha = 1; }
-  var g = grids[tab];
+var REF_OF_STATE = { idle: "idle", walk_east: "east", walk_west: "west", walk_south: "south", walk_north: "north" };
+function ghostKey() {
+  if (mode === "hat") return GHOST_OF[tab];
+  var base = REF_OF_STATE[petState];
+  if (!base) return null;
+  var key = base + Math.min(petFrame, base === "idle" ? 2 : 1);
+  return REF[key] ? key : base + "0";
+}
+function drawGrid(g, alpha) {
+  ectx.globalAlpha = alpha;
   for (var y = 0; y < S; y++) for (var x = 0; x < S; x++)
     if (g[y][x]) { ectx.fillStyle = g[y][x]; ectx.fillRect(x, y, 1, 1); }
+  ectx.globalAlpha = 1;
+}
+function drawEd() {
+  ectx.clearRect(0, 0, ed.width, ed.height);
+  if (showGhost) { var gk = ghostKey(); if (gk && REF[gk]) { ectx.globalAlpha = 0.22; ectx.drawImage(REF[gk], 0, 0); ectx.globalAlpha = 1; } }
+  if (mode === "pet" && onion && petFrame > 0) drawGrid(petGrids[petState][petFrame - 1], 0.25);
+  drawGrid(cur(), 1);
   if (showGrid) {
     ectx.strokeStyle = "rgba(0,0,0,0.08)"; ectx.lineWidth = 0.05; ectx.beginPath();
     for (var i = 1; i < S; i++) { ectx.moveTo(i, 0); ectx.lineTo(i, S); ectx.moveTo(0, i); ectx.lineTo(S, i); }
     ectx.stroke();
   }
-  document.getElementById("tabname").textContent = tab.replace("_", " ");
+  document.getElementById("tabname").textContent =
+    mode === "hat" ? tab.replace("_", " ") : petState.replace("walk_", "") + " #" + petFrame;
 }
 function cell(ev) {
   var r = ed.getBoundingClientRect();
@@ -153,14 +195,14 @@ function cell(ev) {
 }
 var painting = false;
 function paintAt(x, y) {
-  var g = grids[tab];
+  var g = cur();
   function set(px, py, v) { if (px >= 0 && px < S && py >= 0 && py < S) g[py][px] = v; }
   if (tool === "pencil") { set(x, y, color); if (mirror) set(S - 1 - x, y, color); }
   else if (tool === "eraser") { set(x, y, null); if (mirror) set(S - 1 - x, y, null); }
-  else if (tool === "fill") { flood(x, y, g[y][x]); if (mirror) flood(S - 1 - x, y, grids[tab][y][S - 1 - x]); }
+  else if (tool === "fill") { flood(x, y, g[y][x]); if (mirror) flood(S - 1 - x, y, cur()[y][S - 1 - x]); }
 }
 function flood(x, y, target) {
-  var g = grids[tab], want = tool === "eraser" ? null : color;
+  var g = cur(), want = tool === "eraser" ? null : color;
   if (target === want) return;
   var st = [[x, y]];
   while (st.length) {
@@ -178,7 +220,12 @@ ed.addEventListener("pointermove", function (ev) {
   if (!painting || tool === "fill") return;
   ev.preventDefault(); var c = cell(ev); paintAt(c[0], c[1]); drawEd();
 });
-window.addEventListener("pointerup", function () { if (painting) { painting = false; drawPreview(); } });
+window.addEventListener("pointerup", function () {
+  if (!painting) return;
+  painting = false;
+  if (tool === "pencil") touchRecent(color);
+  drawPreview();
+});
 /* toolbar */
 var TOOLS = ["pencil", "eraser", "fill"];
 var toolsEl = document.getElementById("tools");
@@ -191,17 +238,55 @@ TOOLS.forEach(function (t) {
   toolsEl.appendChild(b);
 });
 var tabsEl = document.getElementById("tabs");
-function syncTabs() {
-  Array.prototype.forEach.call(tabsEl.children, function (c) {
-    c.className = (c.textContent.toLowerCase() === (tab === "default" ? "default" : tab.replace("walk_", ""))) ? "on" : ""; });
-}
-TABS.forEach(function (t) {
+var modesEl = document.getElementById("modes");
+var framesEl = document.getElementById("frames");
+function mkBtn(label, on, fn) {
   var b = document.createElement("button");
-  b.textContent = t === "default" ? "DEFAULT" : t.replace("walk_", "").toUpperCase();
-  b.onclick = function () { tab = t; syncTabs(); drawEd(); };
-  tabsEl.appendChild(b);
-});
-syncTabs();
+  b.textContent = label; if (on) b.className = "on";
+  b.onclick = fn;
+  return b;
+}
+function buildModes() {
+  modesEl.innerHTML = "";
+  modesEl.appendChild(mkBtn("HAT", mode === "hat", function () { setMode("hat"); }));
+  modesEl.appendChild(mkBtn("PET", mode === "pet", function () { setMode("pet"); }));
+}
+function shortState(st) {
+  var label = { idle: "IDLE", happy: "HAPPY", sleeping: "SLEEP", dragged: "DRAG",
+    swat: "SWAT", cling_side: "CSIDE", cling_top: "CTOP" }[st];
+  return label || st.replace("walk_", "").toUpperCase().slice(0, 5);
+}
+function buildTabs() {
+  tabsEl.innerHTML = "";
+  if (mode === "hat") {
+    TABS.forEach(function (t) {
+      tabsEl.appendChild(mkBtn(t === "default" ? "DEFAULT" : t.replace("walk_", "").toUpperCase(),
+        t === tab, (function (tt) { return function () { tab = tt; buildTabs(); drawEd(); }; })(t)));
+    });
+  } else {
+    STATES.forEach(function (st) {
+      tabsEl.appendChild(mkBtn(shortState(st), st === petState,
+        (function (x) { return function () { petState = x; petFrame = 0; buildTabs(); buildFrames(); drawEd(); }; })(st)));
+    });
+  }
+}
+function buildFrames() {
+  framesEl.innerHTML = "";
+  if (mode !== "pet") return;
+  for (var i = 0; i < FRAMES[petState]; i++) {
+    framesEl.appendChild(mkBtn("" + i, i === petFrame,
+      (function (n) { return function () { petFrame = n; buildFrames(); drawEd(); }; })(i)));
+  }
+}
+function setMode(m) {
+  mode = m;
+  document.getElementById("petidrow").style.display = m === "pet" ? "" : "none";
+  framesEl.style.display = m === "pet" ? "" : "none";
+  document.getElementById("pettools").style.display = m === "pet" ? "" : "none";
+  document.getElementById("aid").parentElement.style.display = m === "hat" ? "" : "none";
+  buildModes(); buildTabs(); buildFrames(); drawEd(); drawPreview(); refreshDls();
+}
+buildModes(); buildTabs(); buildFrames();
 var PRESETS = ["#ffffff", "#14141a", "#d42a2a", "#e8821e", "#2b2440", null];
 var palEl = document.getElementById("pal");
 PRESETS.forEach(function (c) {
@@ -220,18 +305,48 @@ function syncTools() {
   Array.prototype.forEach.call(toolsEl.children, function (c) {
     c.className = (c.textContent.toLowerCase() === tool) ? "on" : ""; });
 }
-document.getElementById("custom").oninput = function (e) { color = e.target.value; tool = "pencil"; syncTools(); };
+document.getElementById("custom").oninput = function (e) {
+  color = e.target.value; tool = "pencil";
+  document.getElementById("hex").value = color; syncTools();
+};
+document.getElementById("hex").onchange = function (e) {
+  var v = e.target.value.trim().toLowerCase();
+  if (/^#[0-9a-f]{6}$/.test(v)) {
+    color = v; tool = "pencil";
+    document.getElementById("custom").value = v; syncTools();
+  } else { e.target.value = color; }
+};
+function renderRecent() {
+  var el = document.getElementById("recent");
+  el.innerHTML = "";
+  recents.forEach(function (c) {
+    var b = document.createElement("button");
+    b.className = "sw"; b.title = c; b.style.background = c;
+    b.onclick = function () { color = c; tool = "pencil"; syncTools(); };
+    el.appendChild(b);
+  });
+}
+function touchRecent(c) {
+  if (!c) return;
+  recents = [c].concat(recents.filter(function (x) { return x !== c; })).slice(0, 8);
+  renderRecent();
+}
 function tgl(id, fn) { document.getElementById(id).onclick = function () { this.classList.toggle("on"); fn(this.classList.contains("on")); }; }
 tgl("gridbtn", function (v) { showGrid = v; drawEd(); });
 tgl("ghostbtn", function (v) { showGhost = v; drawEd(); });
 tgl("mirrorbtn", function (v) { mirror = v; });
-document.getElementById("undo").onclick = function () {
-  if (!undoSt[tab].length) return;
-  redoSt[tab].push(snap()); grids[tab] = undoSt[tab].pop(); drawEd(); drawPreview(); };
-document.getElementById("redo").onclick = function () {
-  if (!redoSt[tab].length) return;
-  undoSt[tab].push(snap()); grids[tab] = redoSt[tab].pop(); drawEd(); drawPreview(); };
-document.getElementById("clear").onclick = function () { pushUndo(); grids[tab] = blank(); drawEd(); drawPreview(); };
+tgl("livebtn", function (v) { live = v; drawPreview(); });
+tgl("artbtn", function (v) { artOn = v; drawPreview(); });
+tgl("onionbtn", function (v) { onion = v; drawEd(); });
+document.getElementById("undo").onclick = function () { doUndo(); drawEd(); drawPreview(); };
+document.getElementById("redo").onclick = function () { doRedo(); drawEd(); drawPreview(); };
+document.getElementById("clear").onclick = function () { pushUndo(); setCur(blank()); drawEd(); drawPreview(); };
+document.getElementById("copynext").onclick = function () {
+  if (mode !== "pet" || petFrame + 1 >= FRAMES[petState]) return;
+  pushUndo();
+  petGrids[petState][petFrame + 1] = snap();
+  petFrame++; buildFrames(); drawEd(); drawPreview();
+};
 /* ---------- preview (real 5fps cycle) ---------- */
 var pv = document.getElementById("preview"), pctx = pv.getContext("2d");
 pctx.imageSmoothingEnabled = false;
@@ -257,62 +372,111 @@ function artFor(stateTab) {
   if (nonEmpty(grids["default"])) return gridToImg(grids["default"]);
   return null;
 }
-function drawPreview() {
-  var step = CYCLE[cyc % CYCLE.length];
-  pctx.clearRect(0, 0, 64, 64);
-  if (REF[step[0]]) pctx.drawImage(REF[step[0]], 16, 16, 32, 32);
-  var art = artFor(step[1]);
-  if (art) pctx.drawImage(art, 16, 16, 32, 32);
+function nonEmptyG(g) {
+  for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) if (g[y][x]) return true;
+  return false;
 }
-setInterval(function () { cyc++; drawPreview(); }, 200);
+function petCycle() {
+  // contiguous-from-0 non-empty frames per state (mirrors the app loader)
+  var out = [];
+  STATES.forEach(function (st) {
+    var frames = petGrids[st];
+    for (var i = 0; i < frames.length; i++) {
+      if (!nonEmptyG(frames[i])) break;
+      var base = REF_OF_STATE[st];
+      var ref = base ? base + Math.min(i, base === "idle" ? 2 : 1) : null;
+      out.push([ref, st, i]);
+    }
+  });
+  return out;
+}
+function setPvState(t) { document.getElementById("pvstate").textContent = t; }
+function drawPreview() {
+  pctx.clearRect(0, 0, 64, 64);
+  if (!live) { setPvState("paused"); return; }
+  if (mode === "hat") {
+    var step = CYCLE[cyc % CYCLE.length];
+    if (REF[step[0]]) pctx.drawImage(REF[step[0]], 16, 16, 32, 32);
+    if (artOn) { var art = artFor(step[1]); if (art) pctx.drawImage(art, 16, 16, 32, 32); }
+    setPvState(step[1].replace("walk_", "") + (artOn ? "" : " (no art)"));
+  } else {
+    var cyc2 = petCycle();
+    if (!cyc2.length) { setPvState("draw frames!"); return; }
+    var st2 = cyc2[pcyc % cyc2.length];
+    if (st2[0] && REF[st2[0]]) pctx.drawImage(REF[st2[0]], 16, 16, 32, 32);
+    var g = petGrids[st2[1]][st2[2]];
+    pctx.drawImage(gridToImg(g), 16, 16, 32, 32);
+    setPvState(st2[1].replace("walk_", "") + " #" + st2[2]);
+  }
+}
+var pcyc = 0;
+setInterval(function () { cyc++; pcyc++; drawPreview(); }, 200);
 /* ---------- downloads (exact app filenames) ---------- */
 function dlURL(url, name) {
   var a = document.createElement("a");
   a.href = url; a.download = name;
   document.body.appendChild(a); a.click(); a.remove();
 }
-function pngOf(tabName) {
-  var c = gridToImg(grids[tabName]), out = document.createElement("canvas");
+function pngOfGrid(g) {
+  var c = gridToImg(g), out = document.createElement("canvas");
   out.width = out.height = S;
   out.getContext("2d").drawImage(c, 0, 0);
   return out.toDataURL("image/png");
 }
-function nonEmptyTab(t) {
-  var g = grids[t];
-  for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) if (g[y][x]) return true;
-  return false;
-}
+function nonEmptyTab(t) { return nonEmptyG(grids[t]); }
 var dlsEl = document.getElementById("dls");
+function dlBtn(label, fn) {
+  var b = document.createElement("button");
+  b.textContent = label;
+  b.onclick = fn;
+  dlsEl.appendChild(b);
+}
 function refreshDls() {
   dlsEl.innerHTML = "";
-  var files = [["overlay.png", "default"]];
-  TABS.forEach(function (t) {
-    if (t !== "default" && nonEmptyTab(t)) files.push([t + ".png", t]);
-  });
-  files.forEach(function (f) {
-    if (f[1] === "default" && !nonEmptyTab("default")) return;
-    var b = document.createElement("button");
-    b.textContent = f[0];
-    b.onclick = function () { dlURL(pngOf(f[1]), f[0]); };
-    dlsEl.appendChild(b);
-  });
-  var j = document.createElement("button");
-  j.textContent = "bundle.json";
-  j.onclick = function () {
-    var o = { id: document.getElementById("aid").value || "my_hat", files: {} };
-    files.forEach(function (f) {
-      if (f[1] === "default" && !nonEmptyTab("default")) return;
-      o.files[f[0]] = pngOf(f[1]);
+  if (mode === "hat") {
+    if (nonEmptyTab("default")) dlBtn("overlay.png", function () { dlURL(pngOfGrid(grids["default"]), "overlay.png"); });
+    TABS.forEach(function (t) {
+      if (t !== "default" && nonEmptyTab(t)) {
+        dlBtn(t + ".png", (function (tt) { return function () { dlURL(pngOfGrid(grids[tt]), tt + ".png"); }; })(t));
+      }
     });
-    dlURL("data:application/json," + encodeURIComponent(JSON.stringify(o)), o.id + ".msxpet.json");
-  };
-  dlsEl.appendChild(j);
+    dlBtn("bundle.json", function () {
+      var o = { kind: "accessory", id: document.getElementById("aid").value || "my_hat", files: {} };
+      if (nonEmptyTab("default")) o.files["overlay.png"] = pngOfGrid(grids["default"]);
+      TABS.forEach(function (t) {
+        if (t !== "default" && nonEmptyTab(t)) o.files[t + ".png"] = pngOfGrid(grids[t]);
+      });
+      dlURL("data:application/json," + encodeURIComponent(JSON.stringify(o)), o.id + ".msxpet.json");
+    });
+  } else {
+    // pet pack: contiguous-from-0 frames only (mirrors the app loader)
+    var pid = document.getElementById("pid").value || "my_pet";
+    var cur = petGrids[petState][petFrame];
+    dlBtn(petState + "_" + petFrame + ".png", function () {
+      dlURL(pngOfGrid(petGrids[petState][petFrame]), petState + "_" + petFrame + ".png");
+    });
+    dlBtn("pet-bundle.json", function () {
+      var o = { kind: "pet", id: pid, files: {} };
+      STATES.forEach(function (st) {
+        var frames = petGrids[st];
+        for (var i = 0; i < frames.length; i++) {
+          if (!nonEmptyG(frames[i])) break;
+          o.files[st + "/" + i + ".png"] = pngOfGrid(frames[i]);
+        }
+      });
+      dlURL("data:application/json," + encodeURIComponent(JSON.stringify(o)), pid + ".msxpet.json");
+    });
+    var hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent = "install: pets/" + pid + "/<state>/<n>.png, frames numbered from 0 with no gaps";
+    dlsEl.appendChild(hint);
+  }
 }
 setInterval(refreshDls, 1500);
 /* ---------- gallery (bundled, click to load) ---------- */
 var galEl = document.getElementById("gal");
 var galTick = 0;
-setInterval(function () { galTick++; drawGal(); }, 400);
+setInterval(function () { if (!live) return; galTick++; drawGal(); }, 400);
 function drawGal() {
   galEl.innerHTML = "";
   Object.keys(GAL).forEach(function (name) {
@@ -347,11 +511,11 @@ function loadOverlayInto(name) {
       grids["default"][yy][xx] = "rgb(" + r + "," + g + "," + b + ")";
     } else grids["default"][yy][xx] = null;
   }
-  tab = "default"; syncTabs(); drawEd(); drawPreview();
+  tab = "default"; buildTabs(); drawEd(); drawPreview();
   document.getElementById("aid").value = name + "_remix";
 }
 /* ---------- boot ---------- */
-loadAll(function () { drawEd(); drawPreview(); refreshDls(); });
+loadAll(function () { buildModes(); buildTabs(); buildFrames(); renderRecent(); drawEd(); drawPreview(); refreshDls(); });
 </script>
 </body>
 </html>

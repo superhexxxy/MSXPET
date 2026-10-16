@@ -23,7 +23,9 @@ Two homes (user folder wins on name clashes):
 Then 🐾 → Accessories → tick it on. **Reload Assets** rescans without
 restarting. **Reveal Overlays Folder** opens yours in Finder.
 
-Easiest path: the [web studio](https://superhexxxy.github.io/MSXPET/studio.html) — draw, preview on the real walk cycle, download exact filenames.
+Easiest path: the [web studio](https://superhexxxy.github.io/MSXPET/studio.html) — draw accessories AND full pets, preview on the real walk cycle, download exact filenames.
+
+Studio modes: **HAT** (accessories + directional variants) and **PET** (a whole new friend: all 15 states, per-frame editing with onion skin, COPY→NEXT, live cycle preview). Pet packs download as `pets/<id>/<state>/<n>.png` structure — frames numbered from 0 with no gaps, exactly like the app loads them. Ghost references keep your style on-model.
 
 Making one by hand (5 minutes, free):
 
