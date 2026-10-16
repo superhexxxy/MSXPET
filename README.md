@@ -31,6 +31,13 @@ Inspired by [uint23/xpet](https://github.com/uint23/xpet), MSXPET reimagines the
 
 Grab `MSXPET.zip` from the [Releases](https://github.com/superhexxxy/MSXPET/releases). On first launch, right-click the app and choose Open to bypass Gatekeeper for ad-hoc signed builds.
 
+### Homebrew
+
+```zsh
+brew tap superhexxxy/tap
+brew install --cask msxpet
+```
+
 Command-line alternative:
 
 ```zsh
