@@ -81,14 +81,14 @@
         <button id="onionbtn">ONION</button>
       </div>
       <div class="row" id="recent"></div>
-      <p class="hint">tip: ghost shows the neko underneath. draw hats rows 0–12, shades over the eyes.</p>
+      <p class="hint" id="modehint">tip: ghost shows the neko underneath. draw hats rows 0–12, shades over the eyes.</p>
     </section>
     <section>
       <h2>LIVE PREVIEW · <span id="pvstate"></span></h2>
       <div class="row"><button id="artbtn" class="on">ART</button></div>
       <canvas id="preview" class="px" width="64" height="64"></canvas>
-      <p class="hint">your art, on the real walk cycle, 5fps. like the app.</p>
-      <h2 style="margin-top:16px">ACCESSORY ID</h2>
+      <p class="hint" id="pvhinth">your art, on the real walk cycle, 5fps. like the app.</p>
+      <h2 style="margin-top:16px" id="idhead">ACCESSORY ID</h2>
       <div class="row"><input type="text" id="aid" value="my_hat" maxlength="24"></div>
       <h2>DOWNLOAD</h2>
       <div class="row" id="dls"></div>
@@ -223,7 +223,8 @@ ed.addEventListener("pointermove", function (ev) {
 window.addEventListener("pointerup", function () {
   if (!painting) return;
   painting = false;
-  if (tool === "pencil") touchRecent(color);
+  if (tool === "pencil" || tool === "fill") touchRecent(color);
+  if (mode === "pet") buildFrames();
   drawPreview();
 });
 /* toolbar */
@@ -253,8 +254,11 @@ function buildModes() {
 }
 function shortState(st) {
   var label = { idle: "IDLE", happy: "HAPPY", sleeping: "SLEEP", dragged: "DRAG",
-    swat: "SWAT", cling_side: "CSIDE", cling_top: "CTOP" }[st];
-  return label || st.replace("walk_", "").toUpperCase().slice(0, 5);
+    swat: "SWAT", cling_side: "CSIDE", cling_top: "CTOP",
+    walk_north: "N", walk_south: "S", walk_east: "E", walk_west: "W",
+    walk_northwest: "NW", walk_northeast: "NE",
+    walk_southwest: "SW", walk_southeast: "SE" }[st];
+  return label || st;
 }
 function buildTabs() {
   tabsEl.innerHTML = "";
@@ -274,12 +278,24 @@ function buildFrames() {
   framesEl.innerHTML = "";
   if (mode !== "pet") return;
   for (var i = 0; i < FRAMES[petState]; i++) {
-    framesEl.appendChild(mkBtn("" + i, i === petFrame,
+    var has = nonEmptyG(petGrids[petState][i]);
+    framesEl.appendChild(mkBtn((has ? "\u25CF" : "\u25CB") + i, i === petFrame,
       (function (n) { return function () { petFrame = n; buildFrames(); drawEd(); }; })(i)));
   }
 }
+var MODE_HINT = {
+  hat: "tip: ghost shows the neko underneath. draw hats rows 0–12, shades over the eyes.",
+  pet: "tip: trace the ghost, COPY→NEXT for strides. states play in order; gaps stop a state."
+};
+var MODE_PVHINT = {
+  hat: "your art, on the real walk cycle, 5fps. like the app.",
+  pet: "your pet, playing every drawn frame in state order."
+};
 function setMode(m) {
   mode = m;
+  document.getElementById("modehint").textContent = MODE_HINT[m];
+  document.getElementById("pvhinth").textContent = MODE_PVHINT[m];
+  document.getElementById("idhead").textContent = m === "hat" ? "ACCESSORY ID" : "PET ID";
   document.getElementById("petidrow").style.display = m === "pet" ? "" : "none";
   framesEl.style.display = m === "pet" ? "" : "none";
   document.getElementById("pettools").style.display = m === "pet" ? "" : "none";
@@ -410,7 +426,7 @@ function drawPreview() {
   }
 }
 var pcyc = 0;
-setInterval(function () { cyc++; pcyc++; drawPreview(); }, 200);
+setInterval(function () { if (document.hidden) return; cyc++; pcyc++; drawPreview(); }, 200);
 /* ---------- downloads (exact app filenames) ---------- */
 function dlURL(url, name) {
   var a = document.createElement("a");
@@ -425,6 +441,20 @@ function pngOfGrid(g) {
 }
 function nonEmptyTab(t) { return nonEmptyG(grids[t]); }
 var dlsEl = document.getElementById("dls");
+var dlsSig = "";
+function dlsSignature() {
+  if (mode === "hat") {
+    return "h|" + TABS.filter(nonEmptyTab).join(",");
+  }
+  var parts = ["p:" + document.getElementById("pid").value];
+  STATES.forEach(function (st) {
+    var n = 0;
+    var frames = petGrids[st];
+    for (var i = 0; i < frames.length; i++) { if (!nonEmptyG(frames[i])) break; n++; }
+    parts.push(n);
+  });
+  return parts.join(",");
+}
 function dlBtn(label, fn) {
   var b = document.createElement("button");
   b.textContent = label;
@@ -432,6 +462,9 @@ function dlBtn(label, fn) {
   dlsEl.appendChild(b);
 }
 function refreshDls() {
+  var sig = mode + "|" + dlsSignature();
+  if (sig === dlsSig) return;
+  dlsSig = sig;
   dlsEl.innerHTML = "";
   if (mode === "hat") {
     if (nonEmptyTab("default")) dlBtn("overlay.png", function () { dlURL(pngOfGrid(grids["default"]), "overlay.png"); });
@@ -472,28 +505,36 @@ function refreshDls() {
     dlsEl.appendChild(hint);
   }
 }
-setInterval(refreshDls, 1500);
+setInterval(function () { if (!document.hidden) refreshDls(); }, 1500);
 /* ---------- gallery (bundled, click to load) ---------- */
 var galEl = document.getElementById("gal");
 var galTick = 0;
-setInterval(function () { if (!live) return; galTick++; drawGal(); }, 400);
-function drawGal() {
+setInterval(function () { if (!live || document.hidden) return; galTick++; drawGal(); }, 400);
+function buildGal() {
   galEl.innerHTML = "";
   Object.keys(GAL).forEach(function (name) {
     var fig = document.createElement("figure");
     var c = document.createElement("canvas");
     c.width = c.height = 64;
-    var x = c.getContext("2d");
-    x.imageSmoothingEnabled = false;
-    var fr = galTick % 2 ? REF.idle1 : REF.idle0;
-    if (fr) x.drawImage(fr, 16, 16, 32, 32);
-    x.drawImage(GAL[name], 16, 16, 32, 32);
+    c.getContext("2d").imageSmoothingEnabled = false;
     var cap = document.createElement("figcaption");
     cap.textContent = name;
     fig.appendChild(c); fig.appendChild(cap);
     fig.style.cursor = "pointer";
-    fig.onclick = function () { loadOverlayInto(name); };
+    fig.onclick = function () { if (mode !== "hat") setMode("hat"); loadOverlayInto(name); };
+    fig.dataset.name = name;
     galEl.appendChild(fig);
+  });
+}
+function drawGal() {
+  Array.prototype.forEach.call(galEl.children, function (fig) {
+    var c = fig.querySelector("canvas");
+    if (!c) return;
+    var x = c.getContext("2d");
+    x.clearRect(0, 0, 64, 64);
+    var fr = galTick % 2 ? REF.idle1 : REF.idle0;
+    if (fr) x.drawImage(fr, 16, 16, 32, 32);
+    if (GAL[fig.dataset.name]) x.drawImage(GAL[fig.dataset.name], 16, 16, 32, 32);
   });
 }
 function loadOverlayInto(name) {
@@ -515,7 +556,7 @@ function loadOverlayInto(name) {
   document.getElementById("aid").value = name + "_remix";
 }
 /* ---------- boot ---------- */
-loadAll(function () { buildModes(); buildTabs(); buildFrames(); renderRecent(); drawEd(); drawPreview(); refreshDls(); });
+loadAll(function () { buildModes(); buildTabs(); buildFrames(); renderRecent(); buildGal(); drawEd(); drawPreview(); refreshDls(); });
 </script>
 </body>
 </html>
