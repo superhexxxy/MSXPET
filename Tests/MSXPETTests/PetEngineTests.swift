@@ -360,11 +360,18 @@ final class PetEngineTests: XCTestCase {
         e.hourOverride = 12
         e.targetX = 500; e.targetY = 500
         let rect = CGRect(x: 0, y: 0, width: 2000, height: 2000)
-        let near = CGPoint(x: 600, y: 520)
-        for _ in 0..<2500 { e.update(dtMs: 16, mouse: .zero, visibleRect: rect) }
-        XCTAssertEqual(e.state, .idle)
+        // Settle to idle first (waits are 16-32s; never assume a fixed count).
+        var guardTicks = 0
+        while e.state != .idle && guardTicks < 6000 {
+            e.update(dtMs: 16, mouse: .zero, visibleRect: rect)
+            guardTicks += 1
+        }
+        XCTAssertEqual(e.state, .idle, "must settle (took \(guardTicks) ticks)")
+        // Keep the cursor parked next to her every tick (proximity is a
+        // precondition, not what's under test — the beg→reward chain is).
         var begged = false
-        for _ in 0..<3000 {
+        for _ in 0..<9000 {
+            let near = CGPoint(x: min(e.x + 50, 1900), y: min(e.y + 30, 1900))
             e.update(dtMs: 16, mouse: near, visibleRect: rect)
             if e.begging { begged = true; break }
         }
