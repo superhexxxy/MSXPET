@@ -85,7 +85,7 @@
     </section>
     <section>
       <h2>LIVE PREVIEW · <span id="pvstate"></span></h2>
-      <div class="row"><button id="artbtn" class="on">ART</button></div>
+      <div class="row" id="artrow"><button id="artbtn" class="on">ART</button></div>
       <canvas id="preview" class="px" width="64" height="64"></canvas>
       <p class="hint" id="pvhinth">your art, on the real walk cycle, 5fps. like the app.</p>
       <h2 style="margin-top:16px" id="idhead">ACCESSORY ID</h2>
@@ -162,7 +162,10 @@ var ed = document.getElementById("ed"), ectx = ed.getContext("2d");
 ectx.imageSmoothingEnabled = false;
 var REF_OF_STATE = { idle: "idle", walk_east: "east", walk_west: "west", walk_south: "south", walk_north: "north" };
 function ghostKey() {
-  if (mode === "hat") return GHOST_OF[tab];
+  // Pet mode has no ghost: a new pet is drawn on a blank stage.
+  // (Onion skin of your own previous frame is separate and stays.)
+  if (mode !== "hat") return null;
+  return GHOST_OF[tab];
   var base = REF_OF_STATE[petState];
   if (!base) return null;
   var key = base + Math.min(petFrame, base === "idle" ? 2 : 1);
@@ -285,7 +288,7 @@ function buildFrames() {
 }
 var MODE_HINT = {
   hat: "tip: ghost shows the neko underneath. draw hats rows 0–12, shades over the eyes.",
-  pet: "tip: trace the ghost, COPY→NEXT for strides. states play in order; gaps stop a state."
+  pet: "tip: blank canvas, your pixels only. COPY→NEXT for strides. states play in order; gaps stop a state."
 };
 var MODE_PVHINT = {
   hat: "your art, on the real walk cycle, 5fps. like the app.",
@@ -293,6 +296,8 @@ var MODE_PVHINT = {
 };
 function setMode(m) {
   mode = m;
+  document.getElementById("ghostbtn").style.display = m === "hat" ? "" : "none";
+  document.getElementById("artrow").style.display = m === "hat" ? "" : "none";
   document.getElementById("modehint").textContent = MODE_HINT[m];
   document.getElementById("pvhinth").textContent = MODE_PVHINT[m];
   document.getElementById("idhead").textContent = m === "hat" ? "ACCESSORY ID" : "PET ID";
@@ -419,7 +424,7 @@ function drawPreview() {
     var cyc2 = petCycle();
     if (!cyc2.length) { setPvState("draw frames!"); return; }
     var st2 = cyc2[pcyc % cyc2.length];
-    if (st2[0] && REF[st2[0]]) pctx.drawImage(REF[st2[0]], 16, 16, 32, 32);
+    // No reference pet here: only what YOU drew, centered like the app.
     var g = petGrids[st2[1]][st2[2]];
     pctx.drawImage(gridToImg(g), 16, 16, 32, 32);
     setPvState(st2[1].replace("walk_", "") + " #" + st2[2]);
